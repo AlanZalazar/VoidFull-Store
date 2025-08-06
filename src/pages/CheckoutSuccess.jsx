@@ -1,30 +1,23 @@
 import { useEffect, useState } from "react";
 import { useCart } from "../context/CartContext";
-import { auth, db } from "../firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
-import { doc, deleteDoc } from "firebase/firestore";
+import { auth } from "../firebase";
 import { useNavigate } from "react-router-dom";
 
 function CheckoutSuccess() {
-  const { setCart } = useCart();
+  const { clearCart } = useCart();
   const [user] = useAuthState(auth);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const clearCart = async () => {
+    const runClear = async () => {
       try {
-        // Limpiar localStorage
-        localStorage.removeItem("cart");
+        // Limpiar con la función del contexto (maneja local + firestore)
+        await clearCart();
+
+        // Además limpiar sessionStorage
         sessionStorage.removeItem("pendingCheckout");
-
-        // Limpiar Firestore
-        if (user) {
-          await deleteDoc(doc(db, "carts", user.uid));
-        }
-
-        // Limpiar Context
-        setCart([]);
       } catch (error) {
         console.error("❌ Error limpiando el carrito:", error);
       } finally {
@@ -32,8 +25,8 @@ function CheckoutSuccess() {
       }
     };
 
-    clearCart();
-  }, [user, setCart]);
+    runClear();
+  }, [user, clearCart]);
 
   if (loading) {
     return (
