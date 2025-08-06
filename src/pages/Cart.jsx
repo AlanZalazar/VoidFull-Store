@@ -3,20 +3,24 @@ import { useNavigate } from "react-router-dom";
 import { auth } from "../firebase";
 
 function Cart() {
-  const { cart, removeFromCart, clearCart } = useCart();
+  const { cart, removeFromCart } = useCart();
   const navigate = useNavigate();
 
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   const handleCheckout = async () => {
     try {
+      const userId = auth.currentUser?.uid || "guest";
+
       const res = await fetch("/api/createPreference", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: cart }),
+        body: JSON.stringify({ items: cart, userId }),
       });
 
       const data = await res.json();
+      console.log("Respuesta del backend:", data);
+
       if (data.init_point) {
         window.location.href = data.init_point;
       } else {

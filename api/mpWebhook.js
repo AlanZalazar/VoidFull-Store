@@ -11,6 +11,7 @@ if (!admin.apps.length) {
     }),
   });
 }
+
 const db = admin.firestore();
 
 export default async function handler(req, res) {
@@ -20,6 +21,7 @@ export default async function handler(req, res) {
 
   try {
     const paymentId = req.body?.data?.id;
+
     if (!paymentId) {
       return res.status(400).json({ error: "Falta paymentId" });
     }
@@ -33,35 +35,33 @@ export default async function handler(req, res) {
 
     const { status, id, external_reference, payer } = paymentInfo;
 
-    const orderRef = db.collection("tempOrders").doc(external_reference);
-    const orderSnap = await orderRef.get();
-
-    if (!orderSnap.exists) {
-      console.error("No se encontró la orden temporal");
-      return res.status(404).json({ error: "Orden no encontrada" });
+    let userId = "guest";
+    let items = [];
+    try {
+      const refData = JSON.parse(external_reference);
+      userId = refData.userId || "guest";
+      items = refData.cart || [];
+    } catch (err) {
+      console.error("Error parseando external_reference:", err);
     }
 
-    const orderData = orderSnap.data();
-    const total = orderData.items.reduce(
+    const total = items.reduce(
       (sum, item) => sum + item.price * item.quantity,
       0
     );
 
-    // Guardamos en la colección final de orders
     await db
       .collection("orders")
       .doc(String(id))
       .set({
-        ...orderData,
+        userId,
+        items,
         total,
         status,
         paymentId: id,
         payer: payer?.email || "desconocido",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-
-    // Eliminamos la temporal
-    await orderRef.delete();
 
     return res.status(200).json({ success: true });
   } catch (error) {
