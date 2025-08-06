@@ -1,31 +1,36 @@
 import { db } from "../src/firebase";
-import { doc, updateDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import mercadopago from "mercadopago";
 
 export default async function handler(req, res) {
   if (req.method === "POST") {
     try {
-      // Configurar credenciales
       mercadopago.configure({
         access_token: process.env.MP_ACCESS_TOKEN,
       });
 
-      const payment = req.body;
+      const { type, data } = req.body;
 
-      // Obtenemos información del pago
-      const paymentInfo = await mercadopago.payment.findById(payment.data.id);
+      // Mercado Pago te avisa qué tipo de evento fue
+      if (type === "payment") {
+        // Buscar info del pago
+        const payment = await mercadopago.payment.findById(data.id);
+        const info = payment.response;
 
-      const { status, id } = paymentInfo.response;
-
-      // Buscamos la orden que tenga ese paymentId
-      const orderRef = doc(db, "orders", id.toString()); // ojo acá, depende de cómo guardaste paymentId
-      await updateDoc(orderRef, {
-        status,
-      });
+        // Guardar la orden en Firestore
+        await addDoc(collection(db, "orders"), {
+          paymentId: info.id,
+          status: info.status,
+          total: info.transaction_amount,
+          payer: info.payer.email,
+          items: info.additional_info?.items || [],
+          createdAt: serverTimestamp(),
+        });
+      }
 
       return res.status(200).json({ received: true });
     } catch (error) {
-      console.error("Error en webhook:", error);
+      console.error("❌ Error en webhook:", error);
       return res.status(500).json({ error: "Error procesando webhook" });
     }
   }
