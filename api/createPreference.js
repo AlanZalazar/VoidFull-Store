@@ -13,7 +13,13 @@ export default async function handler(req, res) {
 
     const preference = new Preference(client);
 
-    const { items } = req.body;
+    const { items, userId } = req.body;
+
+    // guardamos el carrito y userId en external_reference para recuperarlos en el webhook
+    const externalReference = JSON.stringify({
+      userId: userId || "guest",
+      cart: items,
+    });
 
     const body = {
       items: items.map((item) => ({
@@ -28,6 +34,7 @@ export default async function handler(req, res) {
         pending: `${process.env.NEXT_PUBLIC_URL}/checkout-pending`,
       },
       auto_return: "approved",
+      external_reference: externalReference, // 👈 clave para luego armar la orden
     };
 
     const response = await preference.create({ body });
