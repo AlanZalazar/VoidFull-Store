@@ -1,4 +1,6 @@
 import mercadopago from "mercadopago";
+import { db } from "../firebaseAdmin.js";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -6,20 +8,19 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log(
-      "🔑 Access Token:",
-      process.env.MP_ACCESS_TOKEN ? "Cargado ✅" : "No encontrado ❌"
-    );
-    console.log("📦 Body recibido:", req.body);
-
-    // Inicializar el cliente
     const client = new mercadopago.MercadoPagoConfig({
       accessToken: process.env.MP_ACCESS_TOKEN,
     });
 
     const preference = new mercadopago.Preference(client);
 
-    const { items } = req.body;
+    const { items, userId } = req.body;
+
+    // Calcular el total de la compra
+    const total = items.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    );
 
     const body = {
       items: items.map((item) => ({
@@ -34,21 +35,24 @@ export default async function handler(req, res) {
         pending: `${process.env.NEXT_PUBLIC_URL}/checkout-pending`,
       },
       auto_return: "approved",
-      notification_url: `${process.env.NEXT_PUBLIC_URL}/api/mpWebhook`, // 👈 webhook
-      external_reference: userId || "anon", // 👈 para saber quién compró
     };
 
-    console.log("📤 Enviando preferencia a MP:", body);
-
+    // Crear preferencia en Mercado Pago
     const response = await preference.create({ body });
 
-    console.log("✅ Preferencia creada:", response);
+    // Guardar la orden en Firebase con estado inicial "pending"
+    await addDoc(collection(db, "orders"), {
+      userId: userId || "anonimo",
+      items,
+      total,
+      status: "pending",
+      paymentId: response.id,
+      createdAt: serverTimestamp(),
+    });
 
     return res.status(200).json({ init_point: response.init_point });
   } catch (error) {
     console.error("❌ Error al crear preferencia:", error);
-    return res
-      .status(500)
-      .json({ error: "Error creando preferencia", details: error.message });
+    return res.status(500).json({ error: "Error creando preferencia" });
   }
 }
