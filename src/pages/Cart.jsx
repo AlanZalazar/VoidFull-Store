@@ -10,10 +10,13 @@ function Cart() {
 
   const handleCheckout = async () => {
     try {
+      const user = auth.currentUser; // 👈 obtenemos el usuario actual
+      const userId = user ? user.uid : "anonimo"; // si no está logueado, fallback a "anonimo"
+
       const res = await fetch("/api/createPreference", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: cart, userId: "usuarioID" }),
+        body: JSON.stringify({ items: cart, userId }),
       });
 
       const data = await res.json();
