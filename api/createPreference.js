@@ -6,11 +6,18 @@ export default async function handler(req, res) {
   }
 
   try {
+    console.log(
+      "🔑 MP_ACCESS_TOKEN:",
+      process.env.MP_ACCESS_TOKEN ? "OK" : "MISSING"
+    );
+    console.log("🌍 NEXT_PUBLIC_URL:", process.env.NEXT_PUBLIC_URL);
+
     mercadopago.configure({
-      access_token: process.env.MP_ACCESS_TOKEN, // sin VITE_
+      access_token: process.env.MP_ACCESS_TOKEN,
     });
 
     const { items, userId } = req.body;
+    console.log("🛒 Items recibidos:", items);
 
     const preference = {
       items: items.map((item) => ({
@@ -28,9 +35,11 @@ export default async function handler(req, res) {
     };
 
     const response = await mercadopago.preferences.create(preference);
+    console.log("✅ Preferencia creada:", response.body);
+
     return res.status(200).json({ init_point: response.body.init_point });
   } catch (error) {
-    console.error("Error al crear preferencia:", error);
+    console.error("❌ Error al crear preferencia:", error);
     return res.status(500).json({ error: "Error creando preferencia" });
   }
 }
