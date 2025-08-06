@@ -96,9 +96,24 @@ export function CartProvider({ children }) {
     localStorage.removeItem("cart");
   }, []);
 
+  const updateQuantity = (id, quantity) => {
+    setCart((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, quantity: Math.max(1, quantity) } : item
+      )
+    );
+  };
+
   return (
     <CartContext.Provider
-      value={{ cart, setCart, addToCart, removeFromCart, clearCart }}
+      value={{
+        cart,
+        setCart,
+        addToCart,
+        removeFromCart,
+        clearCart,
+        updateQuantity,
+      }}
     >
       {children}
     </CartContext.Provider>
