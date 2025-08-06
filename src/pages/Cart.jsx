@@ -1,26 +1,31 @@
 import { useCart } from "../context/CartContext";
+import { useNavigate } from "react-router-dom";
+import { auth } from "../firebase"; // 👈 importa Firebase auth
 
 function Cart() {
-  const { cart, removeFromCart, clearCart } = useCart();
+  const { cart, removeFromCart } = useCart();
+  const navigate = useNavigate();
 
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   const handleCheckout = async () => {
+    const user = auth.currentUser;
+
+    if (!user) {
+      alert("Debes iniciar sesión para continuar con la compra.");
+      return navigate("/login"); // 👈 redirige a login si no está logueado
+    }
+
     try {
       const res = await fetch("/api/createPreference", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: cart }),
+        body: JSON.stringify({ items: cart, userId: user.uid }), // 👈 guarda UID del usuario
       });
-
-      if (!res.ok) {
-        throw new Error("Error al crear preferencia");
-      }
 
       const data = await res.json();
 
       if (data.init_point) {
-        // Redirigir al checkout de MercadoPago
         window.location.href = data.init_point;
       } else {
         alert("No se pudo iniciar el pago.");
@@ -30,8 +35,6 @@ function Cart() {
       alert("Error al procesar el pago.");
     }
   };
-
-  console.log("Carrito actual:", cart);
 
   return (
     <div className="p-6">
