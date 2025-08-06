@@ -13,10 +13,7 @@ function CheckoutSuccess() {
   useEffect(() => {
     const runClear = async () => {
       try {
-        // Limpiar con la función del contexto (maneja local + firestore)
         await clearCart();
-
-        // Además limpiar sessionStorage
         sessionStorage.removeItem("pendingCheckout");
       } catch (error) {
         console.error("❌ Error limpiando el carrito:", error);
@@ -26,7 +23,7 @@ function CheckoutSuccess() {
     };
 
     runClear();
-  }, [user, clearCart]);
+  }, []);
 
   if (loading) {
     return (
