@@ -7,11 +7,26 @@ function Cart() {
 
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-  const handleCheckout = () => {
-    // ⚡️ más adelante: verificar login
-    navigate("/checkout");
+  const handleCheckout = async () => {
+    try {
+      const res = await fetch("/api/createPreference", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: cart }),
+      });
+
+      const data = await res.json();
+      if (data.init_point) {
+        clearCart(); // ✅ vacía el carrito
+        window.location.href = data.init_point;
+      } else {
+        alert("No se pudo iniciar el pago.");
+      }
+    } catch (error) {
+      console.error("Error iniciando checkout:", error);
+      alert("Error al procesar el pago.");
+    }
   };
-  console.log("Carrito actual:", cart);
 
   return (
     <div className="p-6">
