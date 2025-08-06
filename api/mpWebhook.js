@@ -5,24 +5,24 @@ import mercadopago from "mercadopago";
 export default async function handler(req, res) {
   if (req.method === "POST") {
     try {
+      // Configurar credenciales
       mercadopago.configure({
         access_token: process.env.MP_ACCESS_TOKEN,
       });
 
       const { type, data } = req.body;
 
-      // Mercado Pago te avisa qué tipo de evento fue
       if (type === "payment") {
         // Buscar info del pago
         const payment = await mercadopago.payment.findById(data.id);
         const info = payment.response;
 
-        // Guardar la orden en Firestore
+        // Guardar en Firebase
         await addDoc(collection(db, "orders"), {
           paymentId: info.id,
           status: info.status,
           total: info.transaction_amount,
-          payer: info.payer.email,
+          payer: info.payer?.email || "desconocido",
           items: info.additional_info?.items || [],
           createdAt: serverTimestamp(),
         });

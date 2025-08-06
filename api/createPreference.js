@@ -19,14 +19,14 @@ export default async function handler(req, res) {
         quantity: item.quantity,
         currency_id: "ARS",
       })),
-      external_reference: userId, // para identificar quién compró
+      external_reference: userId || "anonimo", // para identificar al comprador
       back_urls: {
         success: `${process.env.NEXT_PUBLIC_URL}/checkout-success`,
         failure: `${process.env.NEXT_PUBLIC_URL}/checkout-failure`,
         pending: `${process.env.NEXT_PUBLIC_URL}/checkout-pending`,
       },
       auto_return: "approved",
-      notification_url: `${process.env.NEXT_PUBLIC_URL}/api/mpWebhook`, // webhook
+      notification_url: `${process.env.NEXT_PUBLIC_URL}/api/mpWebhook`, // 👈 avisa al webhook
     };
 
     const response = await mercadopago.preferences.create({ body: preference });
