@@ -1,5 +1,18 @@
 // /api/createPreference.js
 import { MercadoPagoConfig, Preference } from "mercadopago";
+import admin from "firebase-admin";
+
+// Inicializar Firebase Admin
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+    }),
+  });
+}
+const db = admin.firestore();
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -7,19 +20,21 @@ export default async function handler(req, res) {
   }
 
   try {
+    const { items, userId } = req.body;
+
+    // creamos orden temporal en Firestore
+    const orderRef = await db.collection("tempOrders").add({
+      userId: userId || "guest",
+      items,
+      status: "pending",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
     const client = new MercadoPagoConfig({
       accessToken: process.env.MP_ACCESS_TOKEN,
     });
 
     const preference = new Preference(client);
-
-    const { items, userId } = req.body;
-
-    // guardamos el carrito y userId en external_reference para recuperarlos en el webhook
-    const externalReference = JSON.stringify({
-      userId: userId || "guest",
-      cart: items,
-    });
 
     const body = {
       items: items.map((item) => ({
@@ -34,7 +49,7 @@ export default async function handler(req, res) {
         pending: `${process.env.NEXT_PUBLIC_URL}/checkout-pending`,
       },
       auto_return: "approved",
-      external_reference: externalReference, // 👈 clave para luego armar la orden
+      external_reference: orderRef.id, // 👈 solo mandamos el ID, no todo el carrito
     };
 
     const response = await preference.create({ body });

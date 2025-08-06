@@ -2,7 +2,6 @@
 import { MercadoPagoConfig, Payment } from "mercadopago";
 import admin from "firebase-admin";
 
-// Inicializar Firebase Admin (importante: credenciales con service account)
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
@@ -12,7 +11,6 @@ if (!admin.apps.length) {
     }),
   });
 }
-
 const db = admin.firestore();
 
 export default async function handler(req, res) {
@@ -22,7 +20,6 @@ export default async function handler(req, res) {
 
   try {
     const paymentId = req.body?.data?.id;
-
     if (!paymentId) {
       return res.status(400).json({ error: "Falta paymentId" });
     }
@@ -32,42 +29,39 @@ export default async function handler(req, res) {
     });
 
     const payment = new Payment(client);
-
-    // obtener detalles del pago desde MP
     const paymentInfo = await payment.get({ id: paymentId });
 
-    const { status, id, external_reference, transaction_amount, payer } =
-      paymentInfo;
+    const { status, id, external_reference, payer } = paymentInfo;
 
-    // recuperar carrito y userId desde external_reference
-    let userId = "guest";
-    let items = [];
-    try {
-      const refData = JSON.parse(external_reference);
-      userId = refData.userId || "guest";
-      items = refData.cart || [];
-    } catch (err) {
-      console.error("Error parseando external_reference:", err);
+    const orderRef = db.collection("tempOrders").doc(external_reference);
+    const orderSnap = await orderRef.get();
+
+    if (!orderSnap.exists) {
+      console.error("No se encontró la orden temporal");
+      return res.status(404).json({ error: "Orden no encontrada" });
     }
 
-    const total = items.reduce(
+    const orderData = orderSnap.data();
+    const total = orderData.items.reduce(
       (sum, item) => sum + item.price * item.quantity,
       0
     );
 
-    // guardar orden en Firestore
+    // Guardamos en la colección final de orders
     await db
       .collection("orders")
       .doc(String(id))
       .set({
-        userId,
-        items,
+        ...orderData,
         total,
         status,
         paymentId: id,
         payer: payer?.email || "desconocido",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
+
+    // Eliminamos la temporal
+    await orderRef.delete();
 
     return res.status(200).json({ success: true });
   } catch (error) {
