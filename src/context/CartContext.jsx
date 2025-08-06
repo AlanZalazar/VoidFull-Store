@@ -1,5 +1,5 @@
 // CartContext.jsx
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useRef } from "react";
 import { auth, db } from "../firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
@@ -8,33 +8,36 @@ const CartContext = createContext();
 
 export function CartProvider({ children }) {
   const [cart, setCart] = useState([]);
+  const mergedOnce = useRef(false); // ✅ evita duplicaciones
 
-  // Al montar, leer carrito del localStorage
+  // Leer carrito inicial desde localStorage
   useEffect(() => {
     const storedCart = JSON.parse(localStorage.getItem("cart")) || [];
     setCart(storedCart);
   }, []);
 
-  // Guardar carrito en localStorage cada vez que cambia
+  // Guardar en localStorage cuando cambia
   useEffect(() => {
     localStorage.setItem("cart", JSON.stringify(cart));
   }, [cart]);
 
-  // Escuchar cambios de sesión y fusionar carritos
+  // Fusionar solo la primera vez que se loguea
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        try {
-          const userCartRef = doc(db, "carts", user.uid);
-          const userCartSnap = await getDoc(userCartRef);
+      if (!user) return;
 
+      try {
+        const userCartRef = doc(db, "carts", user.uid);
+        const userCartSnap = await getDoc(userCartRef);
+
+        if (!mergedOnce.current) {
           const firestoreCart = userCartSnap.exists()
             ? userCartSnap.data().items || []
             : [];
 
           const localCart = JSON.parse(localStorage.getItem("cart")) || [];
 
-          // Fusionar carritos
+          // Fusionar
           const mergedCart = [...firestoreCart];
           localCart.forEach((localItem) => {
             const existing = mergedCart.find(
@@ -48,15 +51,18 @@ export function CartProvider({ children }) {
           });
 
           setCart(mergedCart);
-
-          // Guardar carrito fusionado en Firestore
           await setDoc(userCartRef, { items: mergedCart });
 
-          // Limpiar localStorage (ya está en Firestore)
           localStorage.removeItem("cart");
-        } catch (error) {
-          console.error("❌ Error fusionando carrito:", error);
+          mergedOnce.current = true; // ✅ no volver a fusionar
+        } else {
+          // Si ya se fusionó → cargar directo desde Firestore
+          if (userCartSnap.exists()) {
+            setCart(userCartSnap.data().items || []);
+          }
         }
+      } catch (error) {
+        console.error("❌ Error cargando carrito:", error);
       }
     });
 
