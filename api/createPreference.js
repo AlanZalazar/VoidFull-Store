@@ -34,6 +34,8 @@ export default async function handler(req, res) {
         pending: `${process.env.NEXT_PUBLIC_URL}/checkout-pending`,
       },
       auto_return: "approved",
+      notification_url: `${process.env.NEXT_PUBLIC_URL}/api/mpWebhook`, // 👈 webhook
+      external_reference: userId || "anon", // 👈 para saber quién compró
     };
 
     console.log("📤 Enviando preferencia a MP:", body);
