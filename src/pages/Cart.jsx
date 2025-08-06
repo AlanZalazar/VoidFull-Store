@@ -9,21 +9,15 @@ function Cart() {
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   const handleCheckout = async () => {
-    const user = auth.currentUser;
-
-    if (!user) {
-      alert("Debes iniciar sesión para continuar con la compra.");
-      return navigate("/login"); // 👈 redirige a login si no está logueado
-    }
-
     try {
       const res = await fetch("/api/createPreference", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: cart, userId: user.uid }), // 👈 guarda UID del usuario
+        body: JSON.stringify({ items: cart, userId: "usuarioID" }),
       });
 
       const data = await res.json();
+      console.log("Respuesta del backend:", data);
 
       if (data.init_point) {
         window.location.href = data.init_point;
