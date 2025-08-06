@@ -10,6 +10,7 @@ import Checkout from "./pages/Checkout";
 import CheckoutSuccess from "./pages/CheckoutSuccess";
 import CheckoutFailure from "./pages/CheckoutFailure";
 import CheckoutPending from "./pages/CheckoutPending";
+import MisCompras from "./pages/MisCompras";
 
 function App() {
   const location = useLocation();
@@ -26,6 +27,7 @@ function App() {
         <Route path="/checkout-success" element={<CheckoutSuccess />} />
         <Route path="/checkout-failure" element={<CheckoutFailure />} />
         <Route path="/checkout-pending" element={<CheckoutPending />} />
+        <Route path="//mis-compras" element={<MisCompras />} />
         <Route path="/admin" element={<Admin />} />
       </Routes>
     </>
