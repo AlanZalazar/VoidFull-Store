@@ -1,16 +1,36 @@
 import { useCart } from "../context/CartContext";
-import { useNavigate } from "react-router-dom";
 
 function Cart() {
   const { cart, removeFromCart, clearCart } = useCart();
-  const navigate = useNavigate();
 
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-  const handleCheckout = () => {
-    // ⚡️ más adelante: verificar login
-    navigate("/checkout");
+  const handleCheckout = async () => {
+    try {
+      const res = await fetch("/api/createPreference", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: cart }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Error al crear preferencia");
+      }
+
+      const data = await res.json();
+
+      if (data.init_point) {
+        // Redirigir al checkout de MercadoPago
+        window.location.href = data.init_point;
+      } else {
+        alert("No se pudo iniciar el pago.");
+      }
+    } catch (error) {
+      console.error("Error iniciando checkout:", error);
+      alert("Error al procesar el pago.");
+    }
   };
+
   console.log("Carrito actual:", cart);
 
   return (

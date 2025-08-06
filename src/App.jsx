@@ -7,6 +7,9 @@ import RegisterForm from "./components/RegisterForm";
 import Cart from "./pages/Cart";
 import Navbar from "./components/Navbar";
 import Checkout from "./pages/Checkout";
+import CheckoutSuccess from "./pages/CheckoutSuccess";
+import CheckoutFailure from "./pages/CheckoutFailure";
+import CheckoutPending from "./pages/CheckoutPending";
 
 function App() {
   const location = useLocation();
@@ -20,6 +23,9 @@ function App() {
         <Route path="/register" element={<RegisterForm />} />
         <Route path="/cart" element={<Cart />} />
         <Route path="/checkout" element={<Checkout />} />
+        <Route path="/checkout-success" element={<CheckoutSuccess />} />
+        <Route path="/checkout-failure" element={<CheckoutFailure />} />
+        <Route path="/checkout-pending" element={<CheckoutPending />} />
         <Route path="/admin" element={<Admin />} />
       </Routes>
     </>
