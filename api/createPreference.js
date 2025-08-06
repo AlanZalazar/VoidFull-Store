@@ -1,6 +1,6 @@
+// api/createPreference.js
 import mercadopago from "mercadopago";
-import { db } from "../firebaseAdmin.js";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { dbAdmin } from "../firebaseAdmin"; // 👈 importa la versión admin
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -8,21 +8,22 @@ export default async function handler(req, res) {
   }
 
   try {
-    const client = new mercadopago.MercadoPagoConfig({
-      accessToken: process.env.MP_ACCESS_TOKEN,
-    });
-
-    const preference = new mercadopago.Preference(client);
-
     const { items, userId } = req.body;
 
-    // Calcular el total de la compra
-    const total = items.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0
-    );
+    if (!items || items.length === 0) {
+      return res.status(400).json({ error: "No se enviaron productos" });
+    }
+    if (!userId) {
+      return res.status(400).json({ error: "Falta userId" });
+    }
 
-    const body = {
+    // Configurar Mercado Pago
+    mercadopago.configure({
+      access_token: process.env.MP_ACCESS_TOKEN,
+    });
+
+    // Crear preferencia
+    const preference = await mercadopago.preferences.create({
       items: items.map((item) => ({
         title: item.name,
         unit_price: item.price,
@@ -35,22 +36,20 @@ export default async function handler(req, res) {
         pending: `${process.env.NEXT_PUBLIC_URL}/checkout-pending`,
       },
       auto_return: "approved",
-    };
-
-    // Crear preferencia en Mercado Pago
-    const response = await preference.create({ body });
-
-    // Guardar la orden en Firebase con estado inicial "pending"
-    await addDoc(collection(db, "orders"), {
-      userId: userId || "anonimo",
-      items,
-      total,
-      status: "pending",
-      paymentId: response.id,
-      createdAt: serverTimestamp(),
     });
 
-    return res.status(200).json({ init_point: response.init_point });
+    // Guardar la orden en Firestore (estado pending)
+    const orderRef = dbAdmin.collection("orders").doc();
+    await orderRef.set({
+      userId,
+      items,
+      total: items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+      status: "pending",
+      preferenceId: preference.body.id,
+      createdAt: new Date(),
+    });
+
+    return res.status(200).json({ init_point: preference.body.init_point });
   } catch (error) {
     console.error("❌ Error al crear preferencia:", error);
     return res.status(500).json({ error: "Error creando preferencia" });
