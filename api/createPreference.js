@@ -1,4 +1,4 @@
-import mercadopago from "mercadopago";
+import { MercadoPagoConfig, Preference } from "mercadopago";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -6,17 +6,20 @@ export default async function handler(req, res) {
   }
 
   try {
-    mercadopago.configure({
-      access_token: process.env.MP_ACCESS_TOKEN,
+    // Inicializar cliente de Mercado Pago
+    const client = new MercadoPagoConfig({
+      accessToken: process.env.MP_ACCESS_TOKEN,
     });
+
+    const preference = new Preference(client);
 
     const { items } = req.body;
 
-    const preference = {
+    const body = {
       items: items.map((item) => ({
         title: item.name,
-        unit_price: item.price,
-        quantity: item.quantity,
+        unit_price: Number(item.price),
+        quantity: Number(item.quantity),
         currency_id: "ARS",
       })),
       back_urls: {
@@ -27,9 +30,9 @@ export default async function handler(req, res) {
       auto_return: "approved",
     };
 
-    const response = await mercadopago.preferences.create(preference);
+    const response = await preference.create({ body });
 
-    return res.status(200).json({ init_point: response.body.init_point });
+    return res.status(200).json({ init_point: response.init_point });
   } catch (error) {
     console.error("❌ Error al crear preferencia:", error);
     return res.status(500).json({ error: "Error creando preferencia" });
