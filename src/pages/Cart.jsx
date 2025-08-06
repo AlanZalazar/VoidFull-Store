@@ -6,10 +6,11 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import { doc, getDoc } from "firebase/firestore";
 
 function Cart() {
-  const { cart, setCart, addToCart, removeFromCart } = useCart();
+  const { cart, setCart, addToCart, removeFromCart, updateQuantity } =
+    useCart();
   const navigate = useNavigate();
   const [user] = useAuthState(auth);
-  const hasLoaded = useRef(false); // ✅ evita recargas múltiples
+  const hasLoaded = useRef(false);
 
   // Calcular total
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -19,7 +20,7 @@ function Cart() {
     localStorage.setItem("cart", JSON.stringify(cart));
   }, [cart]);
 
-  // Cargar carrito (solo una vez por sesión)
+  // Cargar carrito una sola vez
   useEffect(() => {
     if (hasLoaded.current) return;
     hasLoaded.current = true;

@@ -96,13 +96,20 @@ export function CartProvider({ children }) {
     localStorage.removeItem("cart");
   }, []);
 
-  const updateQuantity = (id, quantity) => {
-    setCart((prev) =>
-      prev.map((item) =>
+  const updateQuantity = useCallback(async (id, quantity) => {
+    setCart((prev) => {
+      const updated = prev.map((item) =>
         item.id === id ? { ...item, quantity: Math.max(1, quantity) } : item
-      )
-    );
-  };
+      );
+
+      if (auth.currentUser) {
+        const userCartRef = doc(db, "carts", auth.currentUser.uid);
+        setDoc(userCartRef, { items: updated });
+      }
+
+      return updated;
+    });
+  }, []);
 
   return (
     <CartContext.Provider
