@@ -1,5 +1,11 @@
-// CartContext.jsx
-import { createContext, useContext, useState, useEffect } from "react";
+// src/context/CartContext.jsx
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 import { auth, db } from "../firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
@@ -8,87 +14,93 @@ const CartContext = createContext();
 
 export function CartProvider({ children }) {
   const [cart, setCart] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  // Cargar carrito de localStorage al inicio
+  useEffect(() => {
+    const storedCart = JSON.parse(localStorage.getItem("cart")) || [];
+    setCart(storedCart);
+    setIsLoaded(true);
+  }, []);
 
   // Escuchar cambios de sesión
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setLoading(true);
+      if (!user) return;
 
-      if (user) {
+      try {
         const userCartRef = doc(db, "carts", user.uid);
-        const snap = await getDoc(userCartRef);
+        const userCartSnap = await getDoc(userCartRef);
 
-        if (snap.exists()) {
-          // Si ya existe carrito en Firestore -> usarlo
-          setCart(snap.data().items || []);
+        if (userCartSnap.exists()) {
+          setCart(userCartSnap.data().items || []);
         } else {
-          // Si no existe, tomar el local y subirlo
-          const localCart = JSON.parse(localStorage.getItem("cart")) || [];
-          setCart(localCart);
-          await setDoc(userCartRef, { items: localCart });
+          await setDoc(userCartRef, { items: [] });
         }
 
-        // Limpiar localStorage al loguearse
         localStorage.removeItem("cart");
-      } else {
-        // Usuario no logueado -> usar localStorage
-        const localCart = JSON.parse(localStorage.getItem("cart")) || [];
-        setCart(localCart);
+      } catch (err) {
+        console.error("Error cargando carrito del usuario:", err);
       }
-
-      setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
-  // Guardar cambios en la fuente correspondiente
+  // Guardar cambios en localStorage
   useEffect(() => {
-    if (loading) return;
-
-    const user = auth.currentUser;
-    if (user) {
-      const userCartRef = doc(db, "carts", user.uid);
-      setDoc(userCartRef, { items: cart });
-    } else {
+    if (isLoaded && !auth.currentUser) {
       localStorage.setItem("cart", JSON.stringify(cart));
     }
-  }, [cart, loading]);
+  }, [cart, isLoaded]);
 
-  const addToCart = (product) => {
+  const addToCart = useCallback(async (product) => {
     setCart((prev) => {
       const existing = prev.find((item) => item.id === product.id);
-      return existing
+      const updated = existing
         ? prev.map((item) =>
             item.id === product.id
               ? { ...item, quantity: item.quantity + 1 }
               : item
           )
         : [...prev, { ...product, quantity: 1 }];
+
+      if (auth.currentUser) {
+        const userCartRef = doc(db, "carts", auth.currentUser.uid);
+        setDoc(userCartRef, { items: updated });
+      }
+
+      return updated;
     });
-  };
+  }, []);
 
-  const removeFromCart = (id) => {
-    setCart((prev) => prev.filter((item) => item.id !== id));
-  };
+  const removeFromCart = useCallback(async (id) => {
+    setCart((prev) => {
+      const updated = prev.filter((item) => item.id !== id);
 
-  const clearCart = async () => {
+      if (auth.currentUser) {
+        const userCartRef = doc(db, "carts", auth.currentUser.uid);
+        setDoc(userCartRef, { items: updated });
+      }
+
+      return updated;
+    });
+  }, []);
+
+  const clearCart = useCallback(async () => {
     setCart([]);
-    const user = auth.currentUser;
-    if (user) {
-      const userCartRef = doc(db, "carts", user.uid);
+    if (auth.currentUser) {
+      const userCartRef = doc(db, "carts", auth.currentUser.uid);
       await setDoc(userCartRef, { items: [] });
-    } else {
-      localStorage.removeItem("cart");
     }
-  };
+    localStorage.removeItem("cart");
+  }, []);
 
   return (
     <CartContext.Provider
-      value={{ cart, addToCart, removeFromCart, clearCart, setCart }}
+      value={{ cart, setCart, addToCart, removeFromCart, clearCart }}
     >
-      {!loading && children}
+      {children}
     </CartContext.Provider>
   );
 }

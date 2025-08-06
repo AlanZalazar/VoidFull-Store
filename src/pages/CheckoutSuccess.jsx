@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+// src/pages/CheckoutSuccess.jsx
+import { useEffect, useRef, useState } from "react";
 import { useCart } from "../context/CartContext";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "../firebase";
@@ -9,9 +10,13 @@ function CheckoutSuccess() {
   const [user] = useAuthState(auth);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const hasCleared = useRef(false); // ✅ evita loop
 
   useEffect(() => {
     const runClear = async () => {
+      if (hasCleared.current) return; // solo una vez
+      hasCleared.current = true;
+
       try {
         await clearCart();
         sessionStorage.removeItem("pendingCheckout");
@@ -23,7 +28,7 @@ function CheckoutSuccess() {
     };
 
     runClear();
-  }, []);
+  }, [clearCart, user]);
 
   if (loading) {
     return (
