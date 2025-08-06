@@ -1,4 +1,3 @@
-// /api/mpWebhook.js
 import { MercadoPagoConfig, Payment } from "mercadopago";
 import admin from "firebase-admin";
 
@@ -21,7 +20,6 @@ export default async function handler(req, res) {
 
   try {
     const paymentId = req.body?.data?.id;
-
     if (!paymentId) {
       return res.status(400).json({ error: "Falta paymentId" });
     }
@@ -35,32 +33,15 @@ export default async function handler(req, res) {
 
     const { status, id, external_reference, payer } = paymentInfo;
 
-    let userId = "guest";
-    let items = [];
-    try {
-      const refData = JSON.parse(external_reference);
-      userId = refData.userId || "guest";
-      items = refData.cart || [];
-    } catch (err) {
-      console.error("Error parseando external_reference:", err);
-    }
-
-    const total = items.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0
-    );
-
+    // Actualizamos la orden en Firestore
     await db
       .collection("orders")
-      .doc(String(id))
-      .set({
-        userId,
-        items,
-        total,
+      .doc(external_reference)
+      .update({
         status,
         paymentId: id,
         payer: payer?.email || "desconocido",
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
     return res.status(200).json({ success: true });
