@@ -1,6 +1,6 @@
 // api/createPreference.js
 import mercadopago from "mercadopago";
-import { dbAdmin } from "../firebaseAdmin"; // 👈 importa la versión admin
+import { dbAdmin } from "../lib/firebaseAdmin"; // 👈 importa la versión admin
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {

@@ -1,5 +1,5 @@
 import mercadopago from "mercadopago";
-import { db } from "../firebaseAdmin";
+import { db } from "../lib/firebaseAdmin";
 import { doc, setDoc, updateDoc, getDoc } from "firebase/firestore";
 
 export default async function handler(req, res) {
