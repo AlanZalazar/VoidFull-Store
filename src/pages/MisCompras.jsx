@@ -1,16 +1,17 @@
+// src/pages/MisCompras.jsx
 import { useEffect, useState } from "react";
 import { auth, db } from "../firebase";
-import { useAuthState } from "react-firebase-hooks/auth";
-import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
+import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 
 function MisCompras() {
-  const [user] = useAuthState(auth);
-  const [orders, setOrders] = useState([]);
+  const [compras, setCompras] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchOrders = async () => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
+        setCompras([]);
         setLoading(false);
         return;
       }
@@ -21,97 +22,83 @@ function MisCompras() {
           where("userId", "==", user.uid),
           orderBy("createdAt", "desc")
         );
-        const querySnapshot = await getDocs(q);
+        const snapshot = await getDocs(q);
 
-        const fetchedOrders = querySnapshot.docs.map((doc) => ({
+        const data = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
 
-        setOrders(fetchedOrders);
+        setCompras(data);
       } catch (error) {
-        console.error("❌ Error al obtener órdenes:", error);
+        console.error("Error obteniendo compras:", error);
       } finally {
         setLoading(false);
       }
-    };
+    });
 
-    fetchOrders();
-  }, [user]);
-
-  if (!user) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[70vh] text-center p-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-3">
-          Necesitás iniciar sesión
-        </h1>
-        <p className="text-gray-600">Inicia sesión para ver tus compras.</p>
-      </div>
-    );
-  }
+    return () => unsubscribe();
+  }, []);
 
   if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[70vh]">
-        <div className="animate-spin h-10 w-10 border-4 border-green-600 border-t-transparent rounded-full"></div>
-        <p className="mt-4 text-gray-600">Cargando tus compras...</p>
-      </div>
-    );
+    return <p className="text-center mt-10">Cargando tus compras...</p>;
   }
 
-  if (orders.length === 0) {
+  if (compras.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[70vh] text-center p-6">
-        <h1 className="text-xl font-semibold text-gray-800 mb-2">
-          No tenés compras todavía
-        </h1>
-        <p className="text-gray-600">Cuando compres algo, aparecerá aquí.</p>
+      <div className="text-center mt-10">
+        <p className="text-gray-600">No tenés compras todavía</p>
+        <p className="text-sm text-gray-500">
+          Cuando compres algo, aparecerá aquí.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Mis Compras</h1>
-
+    <div className="max-w-3xl mx-auto p-6">
+      <h1 className="text-2xl font-bold mb-6">Mis Compras</h1>
       <div className="space-y-6">
-        {orders.map((order) => (
+        {compras.map((compra) => (
           <div
-            key={order.id}
-            className="bg-white shadow-md rounded-xl p-6 border border-gray-100"
+            key={compra.id}
+            className="border rounded-lg p-4 shadow-sm bg-white"
           >
-            <div className="flex justify-between items-center mb-4">
-              <p className="text-sm text-gray-500">
-                {order.createdAt?.toDate().toLocaleString() ||
-                  "Fecha desconocida"}
-              </p>
-              <span
-                className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                  order.status === "approved"
-                    ? "bg-green-100 text-green-700"
-                    : order.status === "pending"
-                    ? "bg-yellow-100 text-yellow-700"
-                    : "bg-red-100 text-red-700"
-                }`}
-              >
-                {order.status}
-              </span>
-            </div>
-
-            <ul className="divide-y divide-gray-200 mb-4">
-              {order.items.map((item, index) => (
-                <li key={index} className="flex justify-between py-2">
+            <p className="text-sm text-gray-500">
+              Fecha:{" "}
+              {compra.createdAt?.toDate
+                ? compra.createdAt.toDate().toLocaleString()
+                : "Sin fecha"}
+            </p>
+            <p
+              className={`font-semibold ${
+                compra.status === "approved"
+                  ? "text-green-600"
+                  : compra.status === "pending"
+                  ? "text-yellow-600"
+                  : "text-red-600"
+              }`}
+            >
+              Estado: {compra.status}
+            </p>
+            <ul className="mt-3 space-y-2">
+              {compra.items.map((item, idx) => (
+                <li key={idx} className="flex justify-between">
+                  <div className="flex items-center gap-2">
+                    <img
+                      src={item.imageUrl}
+                      alt={item.name}
+                      className="w-12 h-12 object-cover rounded"
+                    />
+                    <span>{item.name}</span>
+                  </div>
                   <span>
-                    {item.name} × {item.quantity}
+                    {item.quantity} x ${item.price}
                   </span>
-                  <span>${item.price * item.quantity}</span>
                 </li>
               ))}
             </ul>
-
-            <p className="text-right font-bold text-lg text-gray-800">
-              Total: ${order.total}
-            </p>
+            <p className="mt-3 font-bold">Total: ${compra.total}</p>
           </div>
         ))}
       </div>
