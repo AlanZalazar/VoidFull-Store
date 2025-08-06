@@ -1,7 +1,7 @@
 import { useCart } from "../context/CartContext";
 import { useNavigate } from "react-router-dom";
 import { getAuth } from "firebase/auth";
-import { app } from "../src/firebase";
+import { app } from "../firebase";
 
 function Cart() {
   const { cart, removeFromCart, clearCart } = useCart();
