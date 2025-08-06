@@ -1,6 +1,5 @@
 import { useCart } from "../context/CartContext";
 import { useNavigate } from "react-router-dom";
-import { auth } from "../firebase";
 
 function Cart() {
   const { cart, removeFromCart, clearCart } = useCart();
@@ -8,33 +7,11 @@ function Cart() {
 
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-  const handleCheckout = async () => {
-    try {
-      const user = auth.currentUser;
-      if (!user) {
-        alert("Debes iniciar sesión para comprar.");
-        navigate("/login");
-        return;
-      }
-
-      const res = await fetch("/api/createPreference", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: cart, userId: user.uid }),
-      });
-
-      const data = await res.json();
-      if (data.init_point) {
-        clearCart(); // ✅ vaciar carrito tras iniciar checkout
-        window.location.href = data.init_point;
-      } else {
-        alert("No se pudo iniciar el pago.");
-      }
-    } catch (error) {
-      console.error("Error iniciando checkout:", error);
-      alert("Error al procesar el pago.");
-    }
+  const handleCheckout = () => {
+    // ⚡️ más adelante: verificar login
+    navigate("/checkout");
   };
+  console.log("Carrito actual:", cart);
 
   return (
     <div className="p-6">

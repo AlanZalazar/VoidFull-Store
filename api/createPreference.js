@@ -1,5 +1,6 @@
 import mercadopago from "mercadopago";
-import { dbAdmin } from "../lib/firebaseAdmin.js";
+import { db } from "../src/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -7,22 +8,19 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { items, userId } = req.body;
-
-    if (!items || items.length === 0) {
-      return res.status(400).json({ error: "Carrito vacío" });
-    }
-
-    if (!userId) {
-      return res.status(400).json({ error: "Usuario no autenticado" });
-    }
-
-    // Configurar MercadoPago
-    mercadopago.configure({
-      access_token: process.env.MP_ACCESS_TOKEN,
+    const client = new mercadopago.MercadoPagoConfig({
+      accessToken: process.env.MP_ACCESS_TOKEN,
     });
 
-    const preference = {
+    const preference = new mercadopago.Preference(client);
+
+    const { items, userId } = req.body;
+
+    // Calcular total
+    const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+
+    // Crear preferencia en MP
+    const body = {
       items: items.map((item) => ({
         title: item.name,
         unit_price: item.price,
@@ -35,23 +33,21 @@ export default async function handler(req, res) {
         pending: `${process.env.NEXT_PUBLIC_URL}/checkout-pending`,
       },
       auto_return: "approved",
-      notification_url: `${process.env.NEXT_PUBLIC_URL}/api/mpWebhook`,
     };
 
-    const response = await mercadopago.preferences.create(preference);
+    const response = await preference.create({ body });
 
-    // Guardar la orden en Firebase
-    const orderRef = dbAdmin.collection("orders").doc();
-    await orderRef.set({
-      userId,
+    // Guardar orden inicial en Firestore
+    await addDoc(collection(db, "orders"), {
+      userId: userId || null,
       items,
-      total: items.reduce((sum, i) => sum + i.price * i.quantity, 0),
+      total,
       status: "pending",
-      paymentId: response.body.id,
-      createdAt: new Date(),
+      createdAt: serverTimestamp(),
+      preferenceId: response.id,
     });
 
-    return res.status(200).json({ init_point: response.body.init_point });
+    return res.status(200).json({ init_point: response.init_point });
   } catch (error) {
     console.error("❌ Error al crear preferencia:", error);
     return res.status(500).json({ error: "Error creando preferencia" });
