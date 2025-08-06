@@ -1,5 +1,5 @@
 // CartContext.jsx
-import { createContext, useContext, useState, useEffect, useRef } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 import { auth, db } from "../firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
@@ -8,111 +8,79 @@ const CartContext = createContext();
 
 export function CartProvider({ children }) {
   const [cart, setCart] = useState([]);
-  const mergedOnce = useRef(false); // ✅ evita duplicaciones
+  const [loading, setLoading] = useState(true);
 
-  // Leer carrito inicial desde localStorage
-  useEffect(() => {
-    const storedCart = JSON.parse(localStorage.getItem("cart")) || [];
-    setCart(storedCart);
-  }, []);
-
-  // Guardar en localStorage cuando cambia
-  useEffect(() => {
-    localStorage.setItem("cart", JSON.stringify(cart));
-  }, [cart]);
-
-  // Fusionar solo la primera vez que se loguea
+  // Escuchar cambios de sesión
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) return;
+      setLoading(true);
 
-      try {
+      if (user) {
         const userCartRef = doc(db, "carts", user.uid);
-        const userCartSnap = await getDoc(userCartRef);
+        const snap = await getDoc(userCartRef);
 
-        if (!mergedOnce.current) {
-          const firestoreCart = userCartSnap.exists()
-            ? userCartSnap.data().items || []
-            : [];
-
-          const localCart = JSON.parse(localStorage.getItem("cart")) || [];
-
-          // Fusionar
-          const mergedCart = [...firestoreCart];
-          localCart.forEach((localItem) => {
-            const existing = mergedCart.find(
-              (item) => item.id === localItem.id
-            );
-            if (existing) {
-              existing.quantity += localItem.quantity;
-            } else {
-              mergedCart.push(localItem);
-            }
-          });
-
-          setCart(mergedCart);
-          await setDoc(userCartRef, { items: mergedCart });
-
-          localStorage.removeItem("cart");
-          mergedOnce.current = true; // ✅ no volver a fusionar
+        if (snap.exists()) {
+          // Si ya existe carrito en Firestore -> usarlo
+          setCart(snap.data().items || []);
         } else {
-          // Si ya se fusionó → cargar directo desde Firestore
-          if (userCartSnap.exists()) {
-            setCart(userCartSnap.data().items || []);
-          }
+          // Si no existe, tomar el local y subirlo
+          const localCart = JSON.parse(localStorage.getItem("cart")) || [];
+          setCart(localCart);
+          await setDoc(userCartRef, { items: localCart });
         }
-      } catch (error) {
-        console.error("❌ Error cargando carrito:", error);
+
+        // Limpiar localStorage al loguearse
+        localStorage.removeItem("cart");
+      } else {
+        // Usuario no logueado -> usar localStorage
+        const localCart = JSON.parse(localStorage.getItem("cart")) || [];
+        setCart(localCart);
       }
+
+      setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
-  const addToCart = async (product) => {
+  // Guardar cambios en la fuente correspondiente
+  useEffect(() => {
+    if (loading) return;
+
+    const user = auth.currentUser;
+    if (user) {
+      const userCartRef = doc(db, "carts", user.uid);
+      setDoc(userCartRef, { items: cart });
+    } else {
+      localStorage.setItem("cart", JSON.stringify(cart));
+    }
+  }, [cart, loading]);
+
+  const addToCart = (product) => {
     setCart((prev) => {
       const existing = prev.find((item) => item.id === product.id);
-      let updated;
-
-      if (existing) {
-        updated = prev.map((item) =>
-          item.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      } else {
-        updated = [...prev, { ...product, quantity: 1 }];
-      }
-
-      if (auth.currentUser) {
-        const userCartRef = doc(db, "carts", auth.currentUser.uid);
-        setDoc(userCartRef, { items: updated });
-      }
-
-      return updated;
+      return existing
+        ? prev.map((item) =>
+            item.id === product.id
+              ? { ...item, quantity: item.quantity + 1 }
+              : item
+          )
+        : [...prev, { ...product, quantity: 1 }];
     });
   };
 
-  const removeFromCart = async (id) => {
-    setCart((prev) => {
-      const updated = prev.filter((item) => item.id !== id);
-
-      if (auth.currentUser) {
-        const userCartRef = doc(db, "carts", auth.currentUser.uid);
-        setDoc(userCartRef, { items: updated });
-      }
-
-      return updated;
-    });
+  const removeFromCart = (id) => {
+    setCart((prev) => prev.filter((item) => item.id !== id));
   };
 
   const clearCart = async () => {
     setCart([]);
-    localStorage.removeItem("cart");
-
-    if (auth.currentUser) {
-      const userCartRef = doc(db, "carts", auth.currentUser.uid);
+    const user = auth.currentUser;
+    if (user) {
+      const userCartRef = doc(db, "carts", user.uid);
       await setDoc(userCartRef, { items: [] });
+    } else {
+      localStorage.removeItem("cart");
     }
   };
 
@@ -120,7 +88,7 @@ export function CartProvider({ children }) {
     <CartContext.Provider
       value={{ cart, addToCart, removeFromCart, clearCart }}
     >
-      {children}
+      {!loading && children}
     </CartContext.Provider>
   );
 }
