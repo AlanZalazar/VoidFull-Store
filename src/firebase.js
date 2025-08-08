@@ -5,12 +5,12 @@ import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyB0Aqz4Rt0FFGNqTSsxK5hEX2n6cTgPTD4",
-  authDomain: "voidfull-web.firebaseapp.com",
-  projectId: "voidfull-web",
-  storageBucket: "voidfull-web.firebasestorage.app",
-  messagingSenderId: "84919617751",
-  appId: "1:84919617751:web:94421ae4eadab184f80892",
+  apiKey: "AIzaSyAYN2e-Gc2EQc9rXVF3qF-mcee1Qd0mnko",
+  authDomain: "void-full.firebaseapp.com",
+  projectId: "void-full",
+  storageBucket: "void-full.appspot.com",
+  messagingSenderId: "568463431743",
+  appId: "1:568463431743:web:ee214cd683f2ad573d808a",
 };
 
 const app = initializeApp(firebaseConfig);

@@ -1,9 +1,11 @@
+// src/components/RegisterForm.jsx
 import { useState } from "react";
-import { auth, db } from "../firebase";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
-function RegisterForm() {
+export default function RegisterForm() {
+  const navigate = useNavigate();
+  const { register } = useAuth();
   const [form, setForm] = useState({
     email: "",
     password: "",
@@ -12,11 +14,13 @@ function RegisterForm() {
     lastName: "",
     phone: "",
     street: "",
+    floor: "",
     city: "",
     province: "",
     postalCode: "",
+    reference: "",
+    deliveryNotes: "",
   });
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -28,49 +32,20 @@ function RegisterForm() {
     e.preventDefault();
     setLoading(true);
     setError("");
-
-    try {
-      const userCred = await createUserWithEmailAndPassword(
-        auth,
-        form.email,
-        form.password
-      );
-      const user = userCred.user;
-
-      await setDoc(doc(db, "users", user.uid), {
-        uid: user.uid,
-        email: user.email,
-        dni: form.dni,
-        role: "customer",
-        createdAt: new Date(),
-        firstName: form.firstName,
-        lastName: form.lastName,
-        phone: form.phone,
-        address: {
-          street: form.street,
-          city: form.city,
-          province: form.province,
-          postalCode: form.postalCode,
-        },
-      });
-
-      alert("✅ Cuenta creada con éxito. Ahora podés iniciar sesión.");
-    } catch (err) {
-      console.error(err);
-      setError("No se pudo crear la cuenta: " + err.message);
-    } finally {
-      setLoading(false);
-    }
+    const { email, password, ...userData } = form;
+    const res = await register(email, password, userData);
+    if (res.success) navigate("/login", { state: { registered: true } });
+    else setError("No se pudo crear la cuenta: " + res.error);
+    setLoading(false);
   };
 
   return (
     <form
       onSubmit={handleRegister}
-      className="max-w-md mx-auto p-6 bg-white rounded shadow"
+      className="max-w-xl mx-auto bg-white p-6 rounded-lg shadow space-y-4"
     >
-      <h2 className="text-2xl font-bold mb-4">Crear cuenta</h2>
-
-      <div className="grid grid-cols-2 gap-4">
+      <h2 className="text-2xl font-bold text-center">Crear cuenta</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <input
           name="firstName"
           placeholder="Nombre"
@@ -88,7 +63,6 @@ function RegisterForm() {
           className="p-2 border rounded"
         />
       </div>
-
       <input
         name="email"
         type="email"
@@ -96,15 +70,7 @@ function RegisterForm() {
         value={form.email}
         onChange={handleChange}
         required
-        className="w-full mt-3 p-2 border rounded"
-      />
-      <input
-        name="dni"
-        placeholder="DNI"
-        value={form.dni}
-        onChange={handleChange}
-        required
-        className="w-full mt-3 p-2 border rounded"
+        className="w-full p-2 border rounded"
       />
       <input
         name="password"
@@ -113,7 +79,15 @@ function RegisterForm() {
         value={form.password}
         onChange={handleChange}
         required
-        className="w-full mt-3 p-2 border rounded"
+        className="w-full p-2 border rounded"
+      />
+      <input
+        name="dni"
+        placeholder="DNI"
+        value={form.dni}
+        onChange={handleChange}
+        required
+        className="w-full p-2 border rounded"
       />
       <input
         name="phone"
@@ -121,16 +95,22 @@ function RegisterForm() {
         value={form.phone}
         onChange={handleChange}
         required
-        className="w-full mt-3 p-2 border rounded"
+        className="w-full p-2 border rounded"
       />
-
       <input
         name="street"
         placeholder="Calle y número"
         value={form.street}
         onChange={handleChange}
         required
-        className="w-full mt-3 p-2 border rounded"
+        className="w-full p-2 border rounded"
+      />
+      <input
+        name="floor"
+        placeholder="Piso / Departamento"
+        value={form.floor}
+        onChange={handleChange}
+        className="w-full p-2 border rounded"
       />
       <input
         name="city"
@@ -138,7 +118,7 @@ function RegisterForm() {
         value={form.city}
         onChange={handleChange}
         required
-        className="w-full mt-3 p-2 border rounded"
+        className="w-full p-2 border rounded"
       />
       <input
         name="province"
@@ -146,7 +126,7 @@ function RegisterForm() {
         value={form.province}
         onChange={handleChange}
         required
-        className="w-full mt-3 p-2 border rounded"
+        className="w-full p-2 border rounded"
       />
       <input
         name="postalCode"
@@ -154,20 +134,30 @@ function RegisterForm() {
         value={form.postalCode}
         onChange={handleChange}
         required
-        className="w-full mt-3 p-2 border rounded"
+        className="w-full p-2 border rounded"
       />
-
+      <input
+        name="reference"
+        placeholder="Referencia (opcional)"
+        value={form.reference}
+        onChange={handleChange}
+        className="w-full p-2 border rounded"
+      />
+      <textarea
+        name="deliveryNotes"
+        placeholder="Instrucciones de entrega (opcional)"
+        value={form.deliveryNotes}
+        onChange={handleChange}
+        className="w-full p-2 border rounded"
+      />
+      {error && <p className="text-red-500 text-sm">{error}</p>}
       <button
         type="submit"
         disabled={loading}
-        className="w-full mt-4 bg-blue-600 text-white p-2 rounded hover:bg-blue-700 disabled:opacity-50"
+        className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition disabled:opacity-50"
       >
         {loading ? "Creando..." : "Registrarse"}
       </button>
-
-      {error && <p className="text-red-500 mt-2">{error}</p>}
     </form>
   );
 }
-
-export default RegisterForm;

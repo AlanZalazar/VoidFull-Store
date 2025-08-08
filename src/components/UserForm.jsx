@@ -1,45 +1,39 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { db } from "../firebase";
-import { doc, getDoc, setDoc, addDoc, collection } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
-export default function ProductForm() {
+export default function UserForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(!!id);
-  const [product, setProduct] = useState({
-    name: "",
-    price: 0,
-    description: "",
-    category: "",
-    stock: 0,
-    image: "",
-    active: true, // Añadido para consistencia
+  const [user, setUser] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    role: "user",
+    phone: "",
   });
 
   useEffect(() => {
     if (id) {
-      const fetchProduct = async () => {
-        const docRef = doc(db, "products", id);
+      const fetchUser = async () => {
+        const docRef = doc(db, "users", id);
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-          setProduct(docSnap.data());
+          setUser(docSnap.data());
         }
         setLoading(false);
       };
 
-      fetchProduct();
+      fetchUser();
     }
   }, [id]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setProduct((prev) => ({
-      ...prev,
-      [name]:
-        name === "price" || name === "stock" ? parseFloat(value) || 0 : value,
-    }));
+    setUser((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
@@ -47,26 +41,17 @@ export default function ProductForm() {
     setLoading(true);
 
     try {
-      const productData = {
-        ...product,
-        updatedAt: new Date(),
-      };
-
       if (id) {
-        // Editar producto existente
-        await setDoc(doc(db, "products", id), productData, { merge: true });
+        await setDoc(doc(db, "users", id), user, { merge: true });
       } else {
-        // Crear nuevo producto
-        await addDoc(collection(db, "products"), {
-          ...productData,
-          createdAt: new Date(),
-        });
+        // Para crear nuevos usuarios necesitarías implementar auth/createUserWithEmailAndPassword
+        // Esto es solo para actualizar datos de usuario existente
+        alert("Creación de nuevos usuarios requiere implementación adicional");
+        return;
       }
-
-      navigate("/admin/products");
+      navigate("/admin/users");
     } catch (error) {
-      console.error("Error saving product: ", error);
-      alert("Error al guardar el producto");
+      console.error("Error saving user: ", error);
     } finally {
       setLoading(false);
     }
@@ -84,23 +69,23 @@ export default function ProductForm() {
     <div className="px-4 py-6 sm:px-0">
       <div className="bg-white shadow rounded-lg p-6 max-w-3xl mx-auto">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">
-          {id ? "Editar Producto" : "Nuevo Producto"}
+          {id ? "Editar Usuario" : "Nuevo Usuario"}
         </h1>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <div>
               <label
-                htmlFor="name"
+                htmlFor="firstName"
                 className="block text-sm font-medium text-gray-700"
               >
-                Nombre del producto
+                Nombre
               </label>
               <input
                 type="text"
-                name="name"
-                id="name"
-                value={product.name}
+                name="firstName"
+                id="firstName"
+                value={user.firstName}
                 onChange={handleChange}
                 required
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
@@ -109,43 +94,17 @@ export default function ProductForm() {
 
             <div>
               <label
-                htmlFor="price"
+                htmlFor="lastName"
                 className="block text-sm font-medium text-gray-700"
               >
-                Precio
-              </label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-gray-500 sm:text-sm">$</span>
-                </div>
-                <input
-                  type="number"
-                  name="price"
-                  id="price"
-                  value={product.price}
-                  onChange={handleChange}
-                  min="0"
-                  step="0.01"
-                  required
-                  className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md py-2 px-3"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label
-                htmlFor="stock"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Stock disponible
+                Apellido
               </label>
               <input
-                type="number"
-                name="stock"
-                id="stock"
-                value={product.stock}
+                type="text"
+                name="lastName"
+                id="lastName"
+                value={user.lastName}
                 onChange={handleChange}
-                min="0"
                 required
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               />
@@ -153,69 +112,64 @@ export default function ProductForm() {
 
             <div>
               <label
-                htmlFor="category"
+                htmlFor="email"
                 className="block text-sm font-medium text-gray-700"
               >
-                Categoría
+                Email
               </label>
               <input
-                type="text"
-                name="category"
-                id="category"
-                value={product.category}
+                type="email"
+                name="email"
+                id="email"
+                value={user.email}
+                onChange={handleChange}
+                required
+                disabled={!!id}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-gray-100"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="phone"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Teléfono
+              </label>
+              <input
+                type="tel"
+                name="phone"
+                id="phone"
+                value={user.phone}
                 onChange={handleChange}
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               />
             </div>
 
-            <div className="sm:col-span-2">
+            <div>
               <label
-                htmlFor="image"
+                htmlFor="role"
                 className="block text-sm font-medium text-gray-700"
               >
-                URL de la imagen
+                Rol
               </label>
-              <input
-                type="url"
-                name="image"
-                id="image"
-                value={product.image}
+              <select
+                name="role"
+                id="role"
+                value={user.role}
                 onChange={handleChange}
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              />
-              {product.image && (
-                <div className="mt-2">
-                  <img
-                    src={product.image}
-                    alt="Preview"
-                    className="h-32 object-contain"
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="sm:col-span-2">
-              <label
-                htmlFor="description"
-                className="block text-sm font-medium text-gray-700"
               >
-                Descripción
-              </label>
-              <textarea
-                name="description"
-                id="description"
-                rows={3}
-                value={product.description}
-                onChange={handleChange}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              />
+                <option value="user">Usuario</option>
+                <option value="admin">Administrador</option>
+              </select>
             </div>
           </div>
 
           <div className="flex justify-end space-x-3">
             <button
               type="button"
-              onClick={() => navigate("/admin/products")}
+              onClick={() => navigate("/admin/users")}
               className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               Cancelar
@@ -225,7 +179,7 @@ export default function ProductForm() {
               disabled={loading}
               className="bg-blue-600 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
             >
-              {loading ? "Guardando..." : "Guardar Producto"}
+              {loading ? "Guardando..." : "Guardar Usuario"}
             </button>
           </div>
         </form>
