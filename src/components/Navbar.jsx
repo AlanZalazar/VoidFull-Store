@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
-import useClickOutside from "../hooks/useClickOutside";
 
 const NavBar = () => {
   const { user, logout } = useAuth();
@@ -12,7 +11,18 @@ const NavBar = () => {
   const menuRef = useRef(null);
   const navigate = useNavigate();
 
-  useClickOutside(menuRef, () => setIsProfileOpen(false));
+  // 🔹 Lógica de click fuera del menú
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsProfileOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   useEffect(() => {
     if (user?.displayName) {
@@ -38,7 +48,6 @@ const NavBar = () => {
       </Link>
 
       <div className="flex items-center gap-4">
-        {/* Botón de Dashboard para admin */}
         {user?.role === "admin" && (
           <Link
             to="/admin"
@@ -104,7 +113,6 @@ const NavBar = () => {
                   </p>
                 </div>
                 <div>
-                  {/* Opción de Dashboard en el menú desplegable para móviles */}
                   {user.role === "admin" && (
                     <button
                       onClick={() => {
