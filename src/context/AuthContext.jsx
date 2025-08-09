@@ -2,9 +2,11 @@ import { createContext, useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   getAuth,
-  signInWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  browserPopupRedirectResolver,
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
@@ -51,37 +53,61 @@ export function AuthProvider({ children }) {
     setLoading(true);
 
     try {
+      const auth = getAuth();
       const provider = new GoogleAuthProvider();
-      // Agrega estos parámetros para evitar problemas con ventanas emergentes
+
+      // Configuración para evitar problemas de políticas
       provider.setCustomParameters({
         prompt: "select_account",
+        display: "popup",
       });
 
-      const result = await signInWithPopup(auth, provider).catch((err) => {
-        // Manejo específico para errores de ventana emergente
-        if (err.code === "auth/popup-blocked") {
-          throw new Error(
-            "Por favor permite ventanas emergentes para este sitio"
-          );
+      // Detectar si el navegador bloquea popups
+      const isPopupBlocked = () => {
+        const popup = window.open("", "_blank");
+        if (popup === null || typeof popup === "undefined") {
+          return true;
         }
-        if (err.code === "auth/popup-closed-by-user") {
-          throw new Error("Ventana de inicio de sesión cerrada");
-        }
-        throw err;
-      });
+        popup.close();
+        return false;
+      };
 
-      await updateUserData(result.user);
-      navigate("/");
+      if (isPopupBlocked()) {
+        // Usar redirección si los popups están bloqueados
+        await signInWithRedirect(auth, provider);
+        const result = await getRedirectResult(
+          auth,
+          browserPopupRedirectResolver
+        );
+        if (result) {
+          await updateUserData(result.user);
+          navigate("/");
+        }
+      } else {
+        // Usar popup si está permitido
+        const result = await signInWithPopup(
+          auth,
+          provider,
+          browserPopupRedirectResolver
+        );
+        await updateUserData(result.user);
+        navigate("/");
+      }
+
       return true;
     } catch (err) {
       let errorMessage = "Error al conectar con Google";
 
-      if (err.message.includes("ventanas emergentes")) {
-        errorMessage = err.message;
+      if (err.code === "auth/popup-blocked") {
+        errorMessage = "Por favor permite ventanas emergentes para este sitio";
+      } else if (err.code === "auth/popup-closed-by-user") {
+        errorMessage = "Ventana de inicio de sesión cerrada antes de completar";
       } else if (err.code === "auth/network-request-failed") {
         errorMessage = "Problema de conexión. Verifica tu internet";
       } else if (err.code === "auth/operation-not-allowed") {
         errorMessage = "Método de autenticación no habilitado";
+      } else if (err.code === "auth/cancelled-popup-request") {
+        errorMessage = "Solicitud cancelada. Intenta nuevamente";
       } else {
         console.error("Error Google Auth:", err.code, err.message);
       }
