@@ -1,19 +1,17 @@
-// src/components/LoginForm.jsx
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function LoginForm() {
-  const { login, loginWithGoogle } = useAuth();
+  const navigate = useNavigate();
+  const { error, loading, loginWithEmail, loginWithGoogle, setError } =
+    useAuth();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const [shake, setShake] = useState(false);
   const formRef = useRef(null);
-  const navigate = useNavigate();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -21,13 +19,13 @@ export default function LoginForm() {
       ...prev,
       [name]: value,
     }));
+    if (error) setError("");
   };
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
 
-    // Validación de campos vacíos
     if (!formData.email || !formData.password) {
       setShake(true);
       setTimeout(() => setShake(false), 500);
@@ -35,39 +33,11 @@ export default function LoginForm() {
       return;
     }
 
-    setLoading(true);
-
-    try {
-      const res = await login(formData.email, formData.password);
-      if (res?.success) {
-        navigate("/");
-      } else {
-        setError(res?.error || "Correo o contraseña incorrectos.");
-        // Mantenemos los valores en los inputs
-      }
-    } catch (err) {
-      setError("Ocurrió un error inesperado. Intentá nuevamente.");
-    } finally {
-      setLoading(false);
-    }
+    await loginWithEmail(formData.email, formData.password);
   };
 
   const handleGoogleLogin = async () => {
-    setError("");
-    setLoading(true);
-
-    try {
-      const res = await loginWithGoogle();
-      if (res.success) {
-        navigate("/");
-      } else {
-        setError(res.error || "No se pudo iniciar sesión con Google.");
-      }
-    } catch (err) {
-      setError("Ocurrió un error al conectar con Google.");
-    } finally {
-      setLoading(false);
-    }
+    await loginWithGoogle();
   };
 
   const handleGuest = () => {
@@ -87,7 +57,6 @@ export default function LoginForm() {
       }`}
       noValidate
     >
-      {/* Campos del formulario */}
       <div className="space-y-3">
         <input
           type="email"
@@ -98,6 +67,7 @@ export default function LoginForm() {
           required
           autoComplete="email"
           className="border border-gray-300 p-3 w-full rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          aria-describedby="emailError"
         />
         <input
           type="password"
@@ -108,12 +78,17 @@ export default function LoginForm() {
           required
           autoComplete="current-password"
           className="border border-gray-300 p-3 w-full rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          aria-describedby="passwordError"
         />
       </div>
 
-      {/* Mensaje de error */}
       {error && (
-        <p className="text-red-500 text-sm text-center animate-[fade-in_0.3s_ease-out]">
+        <p
+          id="formError"
+          className="text-red-600 bg-red-100 border border-red-400 p-3 rounded-md text-center animate-[fade-in_0.3s_ease-out]"
+          role="alert"
+          aria-live="assertive"
+        >
           {error}
         </p>
       )}
