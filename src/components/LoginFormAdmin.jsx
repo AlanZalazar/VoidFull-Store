@@ -2,12 +2,17 @@ import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-export default function LoginForm() {
+export default function LoginFormAdmin() {
   const [emailError, setEmailError] = useState("");
   const [adminError, setAdminError] = useState("");
   const navigate = useNavigate();
-  const { error, loading, loginWithEmail, loginWithGoogle, setError } =
-    useAuth();
+  const {
+    error,
+    loading,
+    loginAdminWithEmail,
+    loginAdminWithGoogle,
+    setError,
+  } = useAuth();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -28,69 +33,70 @@ export default function LoginForm() {
     if (adminError) setAdminError("");
   };
 
-  const handleLogin = async (e) => {
+  const handleAdminLogin = async (e) => {
     e.preventDefault();
     setError("");
     setAdminError("");
 
+    // Validación de campos vacíos
     if (!formData.email || !formData.password) {
-      setError("Completa todos los campos");
+      setAdminError("Completa todos los campos");
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
+      return;
+    }
+
+    // Validación de formato de email
+    if (emailError) {
+      setAdminError("Correo electrónico inválido");
       setShake(true);
       setTimeout(() => setShake(false), 500);
       return;
     }
 
     try {
-      const success = await loginWithEmail(formData.email, formData.password);
-      if (success) navigate("/");
-    } catch (error) {
-      if (error.message.includes("administradores")) {
-        setAdminError(error.message);
-      } else {
-        setError(error.message);
+      const user = await loginAdminWithEmail(formData.email, formData.password);
+      if (user) {
+        navigate("/admin");
       }
+    } catch (error) {
+      setAdminError(error.message);
       setShake(true);
       setTimeout(() => setShake(false), 500);
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleAdminGoogleLogin = async () => {
     try {
-      const success = await loginWithGoogle();
-      if (success) navigate("/");
-    } catch (error) {
-      if (error.message.includes("administradores")) {
-        setAdminError(error.message);
-      } else {
-        setError(error.message);
+      const user = await loginAdminWithGoogle();
+      if (user) {
+        navigate("/admin");
       }
+    } catch (error) {
+      setAdminError(error.message);
       setShake(true);
       setTimeout(() => setShake(false), 500);
     }
-  };
-
-  const handleGuest = () => {
-    navigate("/");
-  };
-
-  const handleRegister = () => {
-    navigate("/register");
   };
 
   return (
     <form
       ref={formRef}
-      onSubmit={handleLogin}
+      onSubmit={handleAdminLogin}
       className={`bg-white p-8 max-w-sm mx-auto rounded-xl shadow-lg space-y-5 ${
         shake ? "animate-[shake_0.5s_cubic-bezier(.36,.07,.19,.97)_both]" : ""
       }`}
       noValidate
     >
+      <h2 className="text-2xl font-bold text-center text-gray-800">
+        Acceso Administrativo
+      </h2>
+
       <div className="space-y-3">
         <input
           type="email"
           name="email"
-          placeholder="Correo electrónico"
+          placeholder="Correo administrativo"
           value={formData.email}
           onChange={handleChange}
           required
@@ -108,7 +114,7 @@ export default function LoginForm() {
         <input
           type="password"
           name="password"
-          placeholder="Contraseña"
+          placeholder="Contraseña administrativa"
           value={formData.password}
           onChange={handleChange}
           required
@@ -118,45 +124,46 @@ export default function LoginForm() {
         />
       </div>
 
-      {error && <div className="text-red-500">{error}</div>}
-      {adminError && <div className="text-red-500">{adminError}</div>}
+      {error && (
+        <p className="text-red-600 bg-red-100 border border-red-400 p-3 rounded-md text-center">
+          {error}
+        </p>
+      )}
+
+      {adminError && (
+        <p className="text-red-600 bg-red-100 border border-red-400 p-3 rounded-md text-center">
+          {adminError}
+        </p>
+      )}
 
       <button
         type="submit"
         disabled={loading}
         className="bg-blue-600 w-full text-white py-2 rounded-md hover:bg-blue-700 transition disabled:opacity-50"
       >
-        {loading ? "Ingresando..." : "Ingresar"}
+        {loading ? "Verificando credenciales..." : "Acceder al Panel Admin"}
       </button>
 
       <div className="text-center text-gray-400 text-sm">o</div>
 
       <button
         type="button"
-        onClick={handleGoogleLogin}
+        onClick={handleAdminGoogleLogin}
         disabled={loading}
         className="w-full border border-gray-300 py-2 px-4 rounded-md flex items-center justify-center gap-2 hover:bg-gray-50 transition disabled:opacity-50"
       >
         <img src="./logoogle.png" alt="Google logo" className="w-5 h-5" />
-        {loading ? "Conectando..." : "Iniciar sesión con Google"}
-      </button>
-
-      <button
-        type="button"
-        onClick={handleGuest}
-        className="w-full text-sm text-gray-600 hover:underline mt-2"
-      >
-        Continuar como invitado
+        {loading ? "Conectando..." : "Acceso con Google (Admin)"}
       </button>
 
       <div className="text-center text-sm text-gray-600 mt-4">
-        ¿No tenés cuenta?{" "}
+        ¿No tienes acceso administrativo?{" "}
         <button
           type="button"
-          onClick={handleRegister}
+          onClick={() => navigate("/contacto-soporte")}
           className="text-blue-600 hover:underline"
         >
-          Registrate
+          Solicitar acceso
         </button>
       </div>
     </form>

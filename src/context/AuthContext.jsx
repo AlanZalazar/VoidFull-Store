@@ -1,14 +1,21 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   getAuth,
+  signInWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
-  browserPopupRedirectResolver,
+  signOut,
 } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  getDoc,
+  limit,
+} from "firebase/firestore";
 import { db } from "../firebase";
 
 const AuthContext = createContext();
@@ -18,17 +25,152 @@ export function AuthProvider({ children }) {
   const navigate = useNavigate();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState(null);
 
-  const updateUserData = async (firebaseUser) => {
-    const userRef = doc(db, "users", firebaseUser.uid);
+  // Observador de estado de autenticación
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
+      if (firebaseUser) {
+        const token = await firebaseUser.getIdTokenResult();
+        const userData = await updateUserData(firebaseUser);
+
+        setUser({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName || userData?.name || "",
+          role: token.claims.role || userData?.role || "customer",
+        });
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Función logout
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      return { success: true };
+    } catch (error) {
+      setError(error.message);
+      return { success: false, error };
+    }
+  };
+
+  // Actualizar datos del usuario desde Firestore
+  const updateUserData = async (user) => {
+    const userRef = doc(db, "users", user.uid);
     const userDoc = await getDoc(userRef);
     return userDoc.exists() ? userDoc.data() : null;
   };
 
+  // Verificar rol del usuario
+  const checkUserRole = async (email) => {
+    try {
+      const usersRef = collection(db, "users");
+      const q = query(
+        usersRef,
+        where("email", "==", email.toLowerCase()),
+        limit(1)
+      );
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) return "customer";
+
+      const userData = querySnapshot.docs[0].data();
+      return userData.role || "customer";
+    } catch (error) {
+      console.error("Error verificando rol:", error);
+      return "customer"; // Fallback seguro
+    }
+  };
+
+  // Login con email y contraseña
   const loginWithEmail = async (email, password) => {
     setError("");
     setLoading(true);
 
+    try {
+      // 1. Intentar login primero
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const user = userCredential.user;
+
+      // 2. Verificar rol después del login (con permisos)
+      const idToken = await user.getIdTokenResult();
+      if (idToken.claims.role === "admin") {
+        await signOut(auth);
+        throw new Error("Los administradores deben usar el panel especial");
+      }
+
+      // 3. Actualizar datos y redirigir
+      await updateUserData(user);
+      return true;
+    } catch (error) {
+      handleAuthError(error);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Login con Google
+  const loginWithGoogle = async () => {
+    setError("");
+    setLoading(true);
+
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Verificar rol
+      const idToken = await user.getIdTokenResult();
+      if (idToken.claims.role === "admin") {
+        await signOut(auth);
+        throw new Error("Los administradores deben usar el panel especial");
+      }
+
+      await updateUserData(user);
+      return true;
+    } catch (error) {
+      handleAuthError(error);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Manejo de errores
+  const handleAuthError = (error) => {
+    let errorMessage = "Error al iniciar sesión";
+    switch (error.code) {
+      case "auth/invalid-email":
+        errorMessage = "Email inválido";
+        break;
+      case "auth/user-not-found":
+      case "auth/wrong-password":
+        errorMessage = "Credenciales incorrectas";
+        break;
+      case "auth/too-many-requests":
+        errorMessage = "Demasiados intentos. Intenta más tarde";
+        break;
+      default:
+        errorMessage = error.message || errorMessage;
+    }
+    setError(errorMessage);
+  };
+
+  // Función específica para login de admin con email
+  const loginAdminWithEmail = async (email, password) => {
+    setError("");
+    setLoading(true);
     try {
       const userCredential = await signInWithEmailAndPassword(
         auth,
@@ -36,125 +178,59 @@ export function AuthProvider({ children }) {
         password
       );
       const user = userCredential.user;
-      await user.getIdTokenResult(true);
-      await updateUserData(user);
-      navigate("/");
-      return true;
-    } catch (err) {
-      handleAuthError(err);
-      return false;
+
+      // Verificar rol en Firestore
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      if (!userDoc.exists() || userDoc.data().role !== "admin") {
+        await signOut(auth);
+        throw new Error("Acceso restringido a administradores");
+      }
+
+      return user;
+    } catch (error) {
+      handleAuthError(error);
+      return null;
     } finally {
       setLoading(false);
     }
   };
 
-  const loginWithGoogle = async () => {
+  // Función específica para login de admin con Google
+  const loginAdminWithGoogle = async () => {
     setError("");
     setLoading(true);
-
     try {
-      const auth = getAuth();
       const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
 
-      // Configuración para evitar problemas de políticas
-      provider.setCustomParameters({
-        prompt: "select_account",
-        display: "popup",
-      });
-
-      // Detectar si el navegador bloquea popups
-      const isPopupBlocked = () => {
-        const popup = window.open("", "_blank");
-        if (popup === null || typeof popup === "undefined") {
-          return true;
-        }
-        popup.close();
-        return false;
-      };
-
-      if (isPopupBlocked()) {
-        // Usar redirección si los popups están bloqueados
-        await signInWithRedirect(auth, provider);
-        const result = await getRedirectResult(
-          auth,
-          browserPopupRedirectResolver
-        );
-        if (result) {
-          await updateUserData(result.user);
-          navigate("/");
-        }
-      } else {
-        // Usar popup si está permitido
-        const result = await signInWithPopup(
-          auth,
-          provider,
-          browserPopupRedirectResolver
-        );
-        await updateUserData(result.user);
-        navigate("/");
+      // Verificar rol en Firestore
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      if (!userDoc.exists() || userDoc.data().role !== "admin") {
+        await signOut(auth);
+        throw new Error("Acceso restringido a administradores");
       }
 
-      return true;
-    } catch (err) {
-      let errorMessage = "Error al conectar con Google";
-
-      if (err.code === "auth/popup-blocked") {
-        errorMessage = "Por favor permite ventanas emergentes para este sitio";
-      } else if (err.code === "auth/popup-closed-by-user") {
-        errorMessage = "Ventana de inicio de sesión cerrada antes de completar";
-      } else if (err.code === "auth/network-request-failed") {
-        errorMessage = "Problema de conexión. Verifica tu internet";
-      } else if (err.code === "auth/operation-not-allowed") {
-        errorMessage = "Método de autenticación no habilitado";
-      } else if (err.code === "auth/cancelled-popup-request") {
-        errorMessage = "Solicitud cancelada. Intenta nuevamente";
-      } else {
-        console.error("Error Google Auth:", err.code, err.message);
-      }
-
-      setError(errorMessage);
-      return false;
+      return user;
+    } catch (error) {
+      handleAuthError(error);
+      return null;
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAuthError = (error) => {
-    let errorMessage = "Ocurrió un error al iniciar sesión";
-
-    switch (error.code) {
-      case "auth/invalid-email":
-        errorMessage = "El correo electrónico no es válido";
-        break;
-      case "auth/user-disabled":
-        errorMessage = "Esta cuenta ha sido deshabilitada";
-        break;
-      case "auth/user-not-found":
-      case "auth/wrong-password":
-      case "auth/invalid-credential": // Nuevo caso agregado
-        errorMessage = "Correo o contraseña incorrectos";
-        break;
-      case "auth/too-many-requests":
-        errorMessage = "Demasiados intentos fallidos. Intenta más tarde";
-        break;
-      case "auth/popup-closed-by-user":
-        errorMessage =
-          "Te arrepentiste de ingresar con Google? Ingresa con Email y contraseña";
-        break;
-      default:
-        console.error("Error de autenticación:", error.code, error.message);
-        errorMessage = error.message || errorMessage;
-    }
-
-    setError(errorMessage);
-  };
-
+  // Proveer valores del contexto
   const value = {
+    user, // <- Añade esto
     error,
     loading,
     loginWithEmail,
     loginWithGoogle,
+    logout, // <- Añade esto
     setError,
+    loginAdminWithEmail,
+    loginAdminWithGoogle,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

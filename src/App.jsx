@@ -20,6 +20,7 @@ import AdminProducts from "./pages/admin/AdminProducts";
 import AdminOrders from "./pages/admin/AdminOrders";
 import ProductForm from "./components/ProductForm";
 import UserForm from "./components/UserForm";
+import LoginFormAdmin from "./components/LoginFormAdmin";
 
 function App() {
   const location = useLocation();
@@ -30,6 +31,7 @@ function App() {
       <Routes location={location}>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/login/admin" element={<LoginFormAdmin />} />
         <Route path="/register" element={<RegisterForm />} />
         <Route path="/cart" element={<Cart />} />
         <Route path="/checkout" element={<Checkout />} />

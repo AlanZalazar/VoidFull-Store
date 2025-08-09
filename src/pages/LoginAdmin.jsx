@@ -1,12 +1,12 @@
+import LoginFormAdmin from "../components/LoginFormAdmin";
 import { useAuth } from "../context/AuthContext";
-import LoginForm from "../components/LoginForm";
 
 function Login() {
   const { currentUser } = useAuth();
 
   return (
     <div className="p-6">
-      <LoginForm />
+      <LoginFormAdmin />
     </div>
   );
 }
