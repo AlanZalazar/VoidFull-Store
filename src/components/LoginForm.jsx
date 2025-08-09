@@ -1,3 +1,4 @@
+// src/components/LoginForm.jsx
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -11,6 +12,7 @@ export default function LoginForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [shake, setShake] = useState(false);
+  const formRef = useRef(null);
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -21,18 +23,15 @@ export default function LoginForm() {
     }));
   };
 
-  const triggerShake = () => {
-    setShake(true);
-    setTimeout(() => setShake(false), 500);
-  };
-
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
 
+    // Validación de campos vacíos
     if (!formData.email || !formData.password) {
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
       setError("Por favor completa todos los campos");
-      triggerShake();
       return;
     }
 
@@ -40,21 +39,14 @@ export default function LoginForm() {
 
     try {
       const res = await login(formData.email, formData.password);
-
-      if (res.success) {
-        // Redirigir según el rol del usuario
-        if (res.user?.role === "admin") {
-          navigate("/admin");
-        } else {
-          navigate("/");
-        }
+      if (res?.success) {
+        navigate("/");
       } else {
-        setError(res.error || "Correo o contraseña incorrectos.");
-        triggerShake();
+        setError(res?.error || "Correo o contraseña incorrectos.");
+        // Mantenemos los valores en los inputs
       }
     } catch (err) {
       setError("Ocurrió un error inesperado. Intentá nuevamente.");
-      triggerShake();
     } finally {
       setLoading(false);
     }
@@ -67,12 +59,7 @@ export default function LoginForm() {
     try {
       const res = await loginWithGoogle();
       if (res.success) {
-        // Redirigir según el rol del usuario
-        if (res.user?.role === "admin") {
-          navigate("/admin");
-        } else {
-          navigate("/");
-        }
+        navigate("/");
       } else {
         setError(res.error || "No se pudo iniciar sesión con Google.");
       }
@@ -93,16 +80,14 @@ export default function LoginForm() {
 
   return (
     <form
+      ref={formRef}
       onSubmit={handleLogin}
       className={`bg-white p-8 max-w-sm mx-auto rounded-xl shadow-lg space-y-5 ${
         shake ? "animate-[shake_0.5s_cubic-bezier(.36,.07,.19,.97)_both]" : ""
       }`}
       noValidate
     >
-      <h2 className="text-3xl font-bold text-center text-gray-800">
-        Iniciar sesión
-      </h2>
-
+      {/* Campos del formulario */}
       <div className="space-y-3">
         <input
           type="email"
@@ -111,6 +96,7 @@ export default function LoginForm() {
           value={formData.email}
           onChange={handleChange}
           required
+          autoComplete="email"
           className="border border-gray-300 p-3 w-full rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <input
@@ -120,10 +106,12 @@ export default function LoginForm() {
           value={formData.password}
           onChange={handleChange}
           required
+          autoComplete="current-password"
           className="border border-gray-300 p-3 w-full rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
+      {/* Mensaje de error */}
       {error && (
         <p className="text-red-500 text-sm text-center animate-[fade-in_0.3s_ease-out]">
           {error}

@@ -10,7 +10,6 @@ function ProductCard({ product }) {
     setIsAdding(true);
     try {
       await addToCart(product);
-      // Feedback visual opcional podría ir aquí
     } catch (error) {
       console.error("Error adding to cart:", error);
     } finally {
