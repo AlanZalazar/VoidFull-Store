@@ -1,37 +1,83 @@
 import { useState, useEffect } from "react";
 import { db } from "../../firebase";
-import { collection, getDocs } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  doc,
+  getDoc,
+  updateDoc,
+} from "firebase/firestore";
 
 export default function AdminOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(null);
 
   useEffect(() => {
     const fetchOrders = async () => {
       const querySnapshot = await getDocs(collection(db, "orders"));
-      const data = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        // Convertir Firestore Timestamp a Date si existe
-        date: doc.data().date?.toDate?.() || null,
-      }));
 
-      // Ordenar por fecha más reciente primero
-      data.sort((a, b) => (b.date || 0) - (a.date || 0));
+      const ordersData = await Promise.all(
+        querySnapshot.docs.map(async (orderDoc) => {
+          const orderData = orderDoc.data();
+          // Obtener datos del usuario
+          let customerData = null;
+          if (orderData.userId) {
+            const userSnap = await getDoc(doc(db, "users", orderData.userId));
+            customerData = userSnap.exists() ? userSnap.data() : null;
+          }
 
-      setOrders(data);
+          return {
+            id: orderDoc.id,
+            ...orderData,
+            customer: customerData,
+            createdAt: orderData.createdAt?.toDate() || null,
+            updatedAt: orderData.updatedAt?.toDate() || null,
+            // Estado de entrega (si no existe, lo inicializa)
+            orderStatus: orderData.orderStatus || "en_preparacion",
+          };
+        })
+      );
+
+      // Ordenar por fecha más reciente
+      ordersData.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      setOrders(ordersData);
       setLoading(false);
     };
 
     fetchOrders();
   }, []);
 
+  // Actualizar estado de entrega (simulado)
+  const updateOrderStatus = async (orderId, newStatus) => {
+    setUpdating(orderId);
+    try {
+      await updateDoc(doc(db, "orders", orderId), {
+        orderStatus: newStatus,
+        updatedAt: new Date(),
+      });
+      setOrders(
+        orders.map((order) =>
+          order.id === orderId ? { ...order, orderStatus: newStatus } : order
+        )
+      );
+    } catch (error) {
+      console.error("Error al actualizar:", error);
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  // Badges para estados
   const getStatusBadge = (status) => {
     const statusMap = {
-      completed: { color: "bg-green-100 text-green-800", text: "Completado" },
-      pending: { color: "bg-yellow-100 text-yellow-800", text: "Pendiente" },
-      cancelled: { color: "bg-red-100 text-red-800", text: "Cancelado" },
-      processing: { color: "bg-blue-100 text-blue-800", text: "Procesando" },
+      en_preparacion: {
+        color: "bg-blue-100 text-blue-800",
+        text: "En preparación",
+      },
+      en_camino: { color: "bg-yellow-100 text-yellow-800", text: "En camino" },
+      entregado: { color: "bg-green-100 text-green-800", text: "Entregado" },
+      cancelado: { color: "bg-red-100 text-red-800", text: "Cancelado" },
     };
 
     const statusInfo = statusMap[status] || {
@@ -93,16 +139,18 @@ export default function AdminOrders() {
                       Orden #{order.id.slice(0, 8)}
                     </span>
                     <span className="ml-2 text-sm text-gray-500">
-                      {order.date?.toLocaleDateString() || "Fecha desconocida"}
+                      {order.createdAt?.toLocaleDateString("es-AR") ||
+                        "Fecha desconocida"}
                     </span>
                   </div>
-                  <div className="flex items-center">
-                    {getStatusBadge(order.status)}
-                    <span className="ml-3 text-sm font-medium text-gray-900">
+                  <div className="flex items-center space-x-3">
+                    {getStatusBadge(order.orderStatus)}
+                    <span className="text-sm font-medium text-gray-900">
                       ${order.total?.toFixed(2) || "0.00"}
                     </span>
                   </div>
                 </div>
+
                 <div className="p-4">
                   <div className="flex justify-between mb-2">
                     <div>
@@ -110,17 +158,33 @@ export default function AdminOrders() {
                         Cliente
                       </h3>
                       <p className="text-sm text-gray-500">
-                        {order.userEmail || "Correo no disponible"}
+                        {order.customer
+                          ? `${order.customer.firstName} ${order.customer.lastName} (${order.customer.email})`
+                          : "Usuario no registrado"}
                       </p>
                     </div>
-                    <div>
+                    <div className="flex flex-col items-end">
                       <h3 className="text-sm font-medium text-gray-900">
                         Método de pago
                       </h3>
-                      <p className="text-sm text-gray-500">
-                        {order.paymentMethod || "No especificado"}
-                      </p>
+                      <p className="text-sm text-gray-500">MercadoPago</p>
+                      {order.payer && (
+                        <p className="text-sm text-gray-500 mt-1">
+                          {order.payer}
+                        </p>
+                      )}
                     </div>
+                  </div>
+
+                  <div className="mb-2">
+                    <h3 className="text-sm font-medium text-gray-900">
+                      Dirección de envío
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      {order.customer?.address
+                        ? `${order.customer.address.street}, ${order.customer.address.city} (${order.customer.address.postalCode})`
+                        : "No especificada"}
+                    </p>
                   </div>
 
                   <h3 className="text-sm font-medium text-gray-900 mt-3 mb-1">
@@ -131,9 +195,9 @@ export default function AdminOrders() {
                       <li key={idx} className="py-2 flex justify-between">
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-10 w-10 bg-gray-200 rounded-md overflow-hidden">
-                            {item.image && (
+                            {(item.image || item.imageUrl) && (
                               <img
-                                src={item.image}
+                                src={item.image || item.imageUrl}
                                 alt={item.name}
                                 className="h-full w-full object-cover"
                               />
@@ -155,14 +219,26 @@ export default function AdminOrders() {
                     ))}
                   </ul>
 
-                  <div className="mt-4 pt-4 border-t border-gray-200 flex justify-between">
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-900">
-                        Dirección de envío
-                      </h3>
-                      <p className="text-sm text-gray-500">
-                        {order.shippingAddress?.street || "No especificada"}
-                      </p>
+                  <div className="mt-4 pt-4 border-t border-gray-200 flex justify-between items-center">
+                    <div className="flex space-x-2">
+                      <select
+                        value={order.orderStatus}
+                        onChange={(e) =>
+                          updateOrderStatus(order.id, e.target.value)
+                        }
+                        disabled={updating === order.id}
+                        className="text-sm border rounded p-1"
+                      >
+                        <option value="en_preparacion">En preparación</option>
+                        <option value="en_camino">En camino</option>
+                        <option value="entregado">Entregado</option>
+                        <option value="cancelado">Cancelado</option>
+                      </select>
+                      {updating === order.id && (
+                        <span className="text-xs text-gray-500">
+                          Actualizando...
+                        </span>
+                      )}
                     </div>
                     <div className="text-right">
                       <h3 className="text-sm font-medium text-gray-900">

@@ -26,6 +26,7 @@ export function AuthProvider({ children }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
   // Observador de estado de autenticación
   useEffect(() => {
@@ -43,6 +44,7 @@ export function AuthProvider({ children }) {
       } else {
         setUser(null);
       }
+      setAuthLoading(false); // ya sabemos si hay usuario o no
     });
 
     return () => unsubscribe();
@@ -225,6 +227,7 @@ export function AuthProvider({ children }) {
     user, // <- Añade esto
     error,
     loading,
+    authLoading,
     loginWithEmail,
     loginWithGoogle,
     logout, // <- Añade esto

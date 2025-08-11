@@ -2,7 +2,11 @@ import { Outlet, Navigate, Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
 export default function AdminLayout() {
-  const { user } = useAuth();
+  const { user, authLoading } = useAuth();
+
+  if (authLoading) {
+    return <div>Cargando...</div>; // Spinner o algo
+  }
 
   if (!user || user.role !== "admin") {
     return <Navigate to="/" />;

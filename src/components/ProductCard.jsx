@@ -1,139 +1,216 @@
 import { useCart } from "../context/CartContext";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import Swal from "sweetalert2";
+import { HeartIcon as HeartOutline } from "@heroicons/react/24/outline";
+import {
+  HeartIcon as HeartSolid,
+  ShoppingCartIcon,
+} from "@heroicons/react/24/solid";
+import { Link } from "react-router-dom";
 
 function ProductCard({ product }) {
-  const { addToCart } = useCart();
+  const { addToCart, cartItems } = useCart();
   const [isHovered, setIsHovered] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [currentQuantity, setCurrentQuantity] = useState(0);
+
+  // Actualizar cantidad cuando cambie el carrito
+  useEffect(() => {
+    const cartItem = cartItems.find((item) => item.id === product.id);
+    setCurrentQuantity(cartItem?.quantity || 0);
+  }, [cartItems, product.id]);
 
   const handleAddToCart = async () => {
+    if (!product) return;
+
     setIsAdding(true);
     try {
       await addToCart(product);
+
+      // Notificación estilo toast
+      await Swal.fire({
+        position: "top-end",
+        icon: "success",
+        title: "¡Agregado al carrito!",
+        text: `${product.name}`,
+        showConfirmButton: false,
+        timer: 1500,
+        timerProgressBar: true,
+        toast: true,
+        background: "#10B981",
+        color: "white",
+        iconColor: "#FFFFFF",
+      });
     } catch (error) {
-      console.error("Error adding to cart:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: error.message || "No se pudo agregar al carrito",
+      });
     } finally {
       setIsAdding(false);
     }
   };
 
-  return (
-    <div
-      className="relative bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 hover:shadow-lg"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      {/* Badge de destacado (opcional) */}
-      {product.featured && (
-        <div className="absolute top-2 left-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full z-10">
-          Destacado
-        </div>
-      )}
+  const toggleFavorite = () => {
+    setIsFavorite(!isFavorite);
+    Swal.fire({
+      position: "top-end",
+      icon: "success",
+      title: isFavorite ? "Removido de favoritos" : "❤️ ¡Agregado a favoritos!",
+      showConfirmButton: false,
+      timer: 1500,
+      timerProgressBar: true,
+      toast: true,
+      background: isFavorite ? "#6B7280" : "#EC4899",
+      iconColor: isFavorite ? "#9CA3AF" : "#F472B6",
+    });
+  };
 
-      {/* Imagen del producto */}
-      <div className="relative h-64 overflow-hidden">
-        <img
-          src={product.imageUrl || product.image}
-          alt={product.name}
-          className={`w-full h-full object-cover transition-transform duration-500 ${
-            isHovered ? "scale-105" : "scale-100"
-          }`}
-        />
-        {/* Efecto hover */}
+  if (!product) return null;
+
+  return (
+    <div className="relative bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 hover:shadow-xl h-full flex flex-col border border-gray-100">
+      {/* Header de la card */}
+      <div className="relative flex-1">
+        {/* Botón favoritos */}
+        <button
+          onClick={toggleFavorite}
+          className="absolute top-3 right-3 z-20 p-2 rounded-full bg-white/80 backdrop-blur-sm hover:bg-pink-100 transition-colors shadow-sm"
+          aria-label={
+            isFavorite ? "Quitar de favoritos" : "Agregar a favoritos"
+          }
+        >
+          {isFavorite ? (
+            <HeartSolid className="h-6 w-6 text-pink-500 animate-[pulse_0.5s_ease-in-out]" />
+          ) : (
+            <HeartOutline className="h-6 w-6 text-gray-400 hover:text-pink-500 transition-colors" />
+          )}
+        </button>
+
+        {/* Badge destacado */}
+        {product.featured && (
+          <div className="absolute top-2 left-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full z-10 shadow-sm">
+            Destacado
+          </div>
+        )}
+
+        {/* Imagen con efecto hover */}
         <div
-          className={`absolute inset-0 bg-black/20 transition-opacity duration-300 ${
-            isHovered ? "opacity-100" : "opacity-0"
-          }`}
-        ></div>
+          className="relative h-64 overflow-hidden group"
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+        >
+          <img
+            src={
+              product.imageUrl || product.image || "/placeholder-product.jpg"
+            }
+            alt={product.name || "Producto"}
+            className={`w-full h-full object-cover transition-transform duration-700 ${
+              isHovered ? "scale-110" : "scale-100"
+            }`}
+            loading="lazy"
+          />
+          <div
+            className={`absolute inset-0 bg-gradient-to-t from-black/20 via-black/10 to-transparent ${
+              isHovered ? "opacity-100" : "opacity-0"
+            } transition-opacity duration-500`}
+          />
+        </div>
       </div>
 
-      {/* Contenido de la tarjeta */}
-      <div className="p-4">
+      {/* Contenido */}
+      <div className="p-4 flex flex-col gap-2">
         <div className="flex justify-between items-start">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-1">
-              {product.name}
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold text-gray-900 truncate">
+              {product.name || "Producto"}
             </h2>
-            <p className="text-sm text-gray-500 mb-2">
-              {product.category || "Taza de cerámica"}
+            <p className="text-sm text-gray-500">
+              {product.category || "Categoría general"}
             </p>
           </div>
-          <span className="text-lg font-bold text-blue-600">
-            ${product.price.toFixed(2)}
+          <span className="text-lg font-bold text-blue-600 whitespace-nowrap pl-2">
+            ${product.price?.toFixed(2) || "0.00"}
           </span>
         </div>
 
-        {/* Variantes (opcional) */}
-        {product.variants && (
-          <div className="my-2">
-            <p className="text-xs text-gray-500 mb-1">Colores disponibles:</p>
-            <div className="flex space-x-2">
+        {/* Variantes de color */}
+        {product.variants?.length > 0 && (
+          <div className="mt-2">
+            <p className="text-xs text-gray-500 mb-1">Colores:</p>
+            <div className="flex flex-wrap gap-1">
               {product.variants.map((color, index) => (
                 <span
                   key={index}
-                  className="w-4 h-4 rounded-full inline-block"
+                  className="inline-block w-4 h-4 rounded-full border border-gray-200 shadow-xs"
                   style={{ backgroundColor: color }}
-                  title={color}
-                ></span>
+                  title={`Color: ${color}`}
+                />
               ))}
             </div>
           </div>
         )}
 
-        {/* Botón de añadir al carrito */}
-        <button
-          onClick={handleAddToCart}
-          disabled={isAdding}
-          className={`mt-4 w-full py-2 px-4 rounded-lg font-medium transition-colors duration-300 ${
-            isAdding
-              ? "bg-gray-300 text-gray-600"
-              : "bg-blue-600 hover:bg-blue-700 text-white active:scale-105"
-          } flex items-center justify-center`}
-        >
-          {isAdding ? (
-            <>
-              <svg
-                className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                ></circle>
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                ></path>
-              </svg>
-              Añadiendo...
-            </>
-          ) : (
-            <>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 mr-2"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                />
-              </svg>
-              Añadir al carrito
-            </>
-          )}
-        </button>
+        {/* Botones */}
+        <div className="flex items-center gap-2 mt-4">
+          {/* Botón carrito con contador */}
+          <Link
+            to="/cart"
+            className="relative flex-shrink-0 p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center justify-center group"
+            aria-label="Ver carrito"
+          >
+            <ShoppingCartIcon className="h-5 w-5 text-gray-600 group-hover:text-blue-600 transition-colors" />
+            {currentQuantity > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-[bounce_0.5s_ease-in-out] transform hover:scale-110 transition-transform">
+                {currentQuantity}
+              </span>
+            )}
+          </Link>
+
+          {/* Botón principal */}
+          <button
+            onClick={handleAddToCart}
+            disabled={isAdding}
+            className={`flex-1 py-2 px-4 rounded-lg font-medium transition-all duration-300 ${
+              isAdding
+                ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                : "bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white active:scale-[0.98] shadow-md hover:shadow-lg"
+            } flex items-center justify-center gap-2`}
+          >
+            {isAdding ? (
+              <>
+                <svg
+                  className="animate-spin h-4 w-4 text-white"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                Añadiendo...
+              </>
+            ) : (
+              <>
+                <span>Agregar</span>
+                <span className="hidden sm:inline">al carrito</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

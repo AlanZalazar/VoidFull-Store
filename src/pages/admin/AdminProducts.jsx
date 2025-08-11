@@ -3,6 +3,7 @@ import { db } from "../../firebase";
 import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import Swal from "sweetalert2";
 
 export default function AdminProducts() {
   const { user } = useAuth();
@@ -39,11 +40,36 @@ export default function AdminProducts() {
   }, [user, navigate]);
 
   const handleDelete = async (id) => {
-    if (!window.confirm("¿Eliminar este producto permanentemente?")) return;
+    if (
+      !(
+        await Swal.fire({
+          title: "¿Eliminar?",
+          text: "¡No podrás revertir esto!",
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonColor: "#3085d6",
+          cancelButtonColor: "#d33",
+          confirmButtonText: "Sí, eliminar",
+          cancelButtonText: "Cancelar",
+        })
+      ).isConfirmed
+    )
+      return;
 
     try {
       await deleteDoc(doc(db, "products", id));
       setProducts(products.filter((p) => p.id !== id));
+      await Swal.fire({
+        title: "¡Producto eliminado!",
+        text: "Poof... como magia",
+        icon: "success",
+        showConfirmButton: false,
+        timer: 1500,
+        timerProgressBar: true,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+      });
     } catch (err) {
       console.error("Error al eliminar:", err);
       setError("No tienes permisos para esta acción");
