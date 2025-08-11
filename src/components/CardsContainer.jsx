@@ -1,25 +1,31 @@
 import { motion, useAnimation } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import ProductCard from "./ProductCard";
-import { FiChevronLeft, FiChevronRight, FiSearch } from "react-icons/fi";
+import {
+  FiChevronLeft,
+  FiChevronRight,
+  FiSearch,
+  FiPlus,
+} from "react-icons/fi";
 import { useInView } from "react-intersection-observer";
+import { useMediaQuery } from "react-responsive";
 
-const CardsContainer = ({ products, category }) => {
+const CardsContainer = ({ products }) => {
   const controls = useAnimation();
   const [ref, inView] = useInView({ threshold: 0.1 });
-  const containerRef = useRef(null);
-
-  const [isHoveringContainer, setIsHoveringContainer] = useState(false);
-  const [currentPage, setCurrentPage] = useState(0);
+  const isMobile = useMediaQuery({ maxWidth: 640 });
 
   // 🔍 Estados para filtros y búsqueda
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [sortOrder, setSortOrder] = useState("none");
 
-  // 🖥 Mostrar más cards por página (8 mínimo)
-  const productsPerPage =
-    window.innerWidth < 640 ? 2 : window.innerWidth < 1024 ? 4 : 8;
+  // 📱 Estado para carga progresiva en móviles
+  const [visibleProducts, setVisibleProducts] = useState(0);
+
+  // 🖥 Determinar cantidad de productos por página/load
+  const productsPerLoad = isMobile ? 5 : 8;
+  const desktopProductsPerPage = window.innerWidth < 1024 ? 4 : 8;
 
   // ✨ Animación de aparición
   useEffect(() => {
@@ -43,7 +49,22 @@ const CardsContainer = ({ products, category }) => {
       return 0;
     });
 
-  const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
+  // 📱 Resetear productos visibles cuando cambian los filtros
+  useEffect(() => {
+    setVisibleProducts(isMobile ? productsPerLoad : filteredProducts.length);
+  }, [
+    isMobile,
+    filteredProducts.length,
+    searchTerm,
+    selectedCategory,
+    sortOrder,
+  ]);
+
+  // 🖥 Paginación para desktop
+  const [currentPage, setCurrentPage] = useState(0);
+  const totalPages = Math.ceil(
+    filteredProducts.length / desktopProductsPerPage
+  );
 
   const handleNext = () => {
     setCurrentPage((prev) => (prev + 1) % totalPages);
@@ -52,10 +73,12 @@ const CardsContainer = ({ products, category }) => {
     setCurrentPage((prev) => (prev - 1 + totalPages) % totalPages);
   };
 
-  const paginatedProducts = filteredProducts.slice(
-    currentPage * productsPerPage,
-    (currentPage + 1) * productsPerPage
-  );
+  // 📱 Función para cargar más productos en móvil
+  const loadMoreProducts = () => {
+    setVisibleProducts((prev) =>
+      Math.min(prev + productsPerLoad, filteredProducts.length)
+    );
+  };
 
   // 🎭 Variantes de animación
   const containerVariants = {
@@ -82,10 +105,18 @@ const CardsContainer = ({ products, category }) => {
     },
   };
 
+  // 📦 Productos a mostrar
+  const productsToShow = isMobile
+    ? filteredProducts.slice(0, visibleProducts)
+    : filteredProducts.slice(
+        currentPage * desktopProductsPerPage,
+        (currentPage + 1) * desktopProductsPerPage
+      );
+
   return (
     <section
       ref={ref}
-      className="relative py-16 px-4 sm:px-6 lg:px-8"
+      className="relative py-6 px-10 sm:px-6 lg:px-8"
       style={{
         background:
           "linear-gradient(135deg, rgba(255,182,193,0.3), rgba(173,216,230,0.3))",
@@ -139,8 +170,8 @@ const CardsContainer = ({ products, category }) => {
         </select>
       </div>
 
-      {/* Navegación */}
-      {totalPages > 1 && (
+      {/* Navegación para desktop */}
+      {!isMobile && totalPages > 1 && (
         <>
           <motion.button
             onClick={handlePrev}
@@ -163,14 +194,14 @@ const CardsContainer = ({ products, category }) => {
       )}
 
       {/* Cards */}
-      {paginatedProducts.length > 0 ? (
+      {productsToShow.length > 0 ? (
         <motion.div
           variants={containerVariants}
           initial="hidden"
           animate={controls}
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-6 relative z-10"
         >
-          {paginatedProducts.map((product) => (
+          {productsToShow.map((product) => (
             <motion.div
               key={product.id}
               variants={cardVariants}
@@ -186,8 +217,23 @@ const CardsContainer = ({ products, category }) => {
         </div>
       )}
 
-      {/* Indicadores */}
-      {totalPages > 1 && (
+      {/* Botón "Cargar más" para móviles */}
+      {isMobile && visibleProducts < filteredProducts.length && (
+        <div className="flex justify-center mt-8">
+          <motion.button
+            onClick={loadMoreProducts}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex items-center gap-2 px-6 py-3 rounded-full shadow-lg bg-gradient-to-r from-pink-400 to-purple-500 text-white"
+          >
+            <FiPlus className="w-5 h-5" />
+            Cargar más productos
+          </motion.button>
+        </div>
+      )}
+
+      {/* Indicadores de página para desktop */}
+      {!isMobile && totalPages > 1 && (
         <div className="flex justify-center mt-8 gap-2">
           {Array.from({ length: totalPages }).map((_, idx) => (
             <motion.button

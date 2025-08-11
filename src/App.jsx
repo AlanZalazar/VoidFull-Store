@@ -21,6 +21,9 @@ import AdminOrders from "./pages/admin/AdminOrders";
 import ProductForm from "./components/ProductForm";
 import UserForm from "./components/UserForm";
 import LoginFormAdmin from "./components/LoginFormAdmin";
+import HomeEditorLayout from "./pages/admin/HomeEditorLayout";
+import AdminCarruselEditor from "./pages/admin/AdminCarruselEditor";
+import CarruselPage from "./pages/CarruselPage";
 
 function App() {
   const location = useLocation();
@@ -40,6 +43,7 @@ function App() {
         <Route path="/checkout-pending" element={<CheckoutPending />} />
         <Route path="/mis-compras" element={<MisCompras />} />
         <Route path="/perfil" element={<Perfil />} />
+        <Route path="/carrusel" element={<CarruselPage />} />
 
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
@@ -50,6 +54,11 @@ function App() {
           <Route path="products/new" element={<ProductForm />} />
           <Route path="products/edit/:id" element={<ProductForm />} />
           <Route path="orders" element={<AdminOrders />} />
+          <Route path="carruselIzquierdo" element={<AdminCarruselEditor />} />
+
+          <Route path="home" element={<HomeEditorLayout />}>
+            <Route index element={<Home editable={true} />} />
+          </Route>
         </Route>
       </Routes>
     </>

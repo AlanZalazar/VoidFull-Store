@@ -70,6 +70,9 @@ function ProductCard({ product }) {
 
   if (!product) return null;
 
+  // Verificar si hay descuento
+  const hasDiscount = product.desc > 0;
+
   return (
     <div className="relative bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 hover:shadow-xl h-full flex flex-col border border-gray-100">
       {/* Header de la card */}
@@ -93,6 +96,13 @@ function ProductCard({ product }) {
         {product.featured && (
           <div className="absolute top-2 left-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full z-10 shadow-sm">
             Destacado
+          </div>
+        )}
+
+        {/* Badge de descuento */}
+        {hasDiscount && (
+          <div className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full z-10 shadow-sm">
+            -{product.desc}%
           </div>
         )}
 
@@ -131,9 +141,22 @@ function ProductCard({ product }) {
               {product.category || "Categoría general"}
             </p>
           </div>
-          <span className="text-lg font-bold text-blue-600 whitespace-nowrap pl-2">
-            ${product.price?.toFixed(2) || "0.00"}
-          </span>
+          <div className="flex flex-col items-end">
+            {hasDiscount ? (
+              <>
+                <span className="text-lg font-bold text-red-500 whitespace-nowrap">
+                  ${product.price?.toFixed(2) || "0.00"}
+                </span>
+                <span className="text-sm text-gray-400 line-through">
+                  ${product.priceBase?.toFixed(2) || "0.00"}
+                </span>
+              </>
+            ) : (
+              <span className="text-lg font-bold text-blue-600 whitespace-nowrap">
+                ${product.price?.toFixed(2) || "0.00"}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Variantes de color */}

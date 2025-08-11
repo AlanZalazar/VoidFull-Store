@@ -1,9 +1,54 @@
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { db } from "../../firebase";
+import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
 
 export default function AdminDashboard() {
+  const [components, setComponents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  // Carga de componentes desde Firestore
+  useEffect(() => {
+    const fetchComponents = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "components"));
+        const docs = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setComponents(docs);
+      } catch (error) {
+        console.error("Error fetching components:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchComponents();
+  }, []);
+
+  const toggleActive = async (id, currentState) => {
+    try {
+      // Actualizar Firestore
+      await updateDoc(doc(db, "components", id), {
+        active: !currentState,
+      });
+
+      // Actualizar estado local
+      setComponents((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, active: !currentState } : c))
+      );
+    } catch (error) {
+      console.error("Error updating component:", error);
+    }
+  };
+
+  if (loading) return <div className="p-8 text-center">Cargando editor...</div>;
+
   return (
     <div className="px-4 py-6 sm:px-0">
-      <div className="bg-white shadow rounded-lg p-6">
+      <div className="bg-white shadow rounded-lg p-6 mb-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -118,6 +163,50 @@ export default function AdminDashboard() {
           </Link>
         </div>
       </div>
+
+      {/* ADMIN EDITOR */}
+      <section className="bg-white shadow rounded-lg p-6">
+        <h2 className="text-xl font-bold mb-4">Admin Editor</h2>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          {components.map(({ id, name, active, colors }) => (
+            <div
+              key={id}
+              className="rounded-lg shadow-lg p-6 flex flex-col justify-between"
+              style={{
+                background: `linear-gradient(135deg, ${
+                  colors?.[0] || "#ccc"
+                }, ${colors?.[1] || "#999"})`,
+                color: active ? "white" : "rgba(255,255,255,0.7)",
+                minHeight: "220px",
+              }}
+            >
+              <h3 className="text-2xl font-semibold mb-6 text-center select-none">
+                {name}
+              </h3>
+
+              <div className="flex justify-center space-x-4">
+                <button
+                  onClick={() => toggleActive(id, active)}
+                  className={`px-5 py-2 rounded-md font-medium transition-colors duration-200 ${
+                    active
+                      ? "bg-red-600 hover:bg-red-700"
+                      : "bg-green-600 hover:bg-green-700"
+                  }`}
+                >
+                  {active ? "Desactivar" : "Activar"}
+                </button>
+                <button
+                  onClick={() => navigate(`/admin/${id}`)}
+                  className="px-5 py-2 rounded-md font-medium bg-gray-900 bg-opacity-30 hover:bg-opacity-50 transition"
+                >
+                  Configurar
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

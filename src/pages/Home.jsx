@@ -2,13 +2,12 @@ import { useEffect, useState } from "react";
 import { db } from "../firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import CardsContainer from "../components/CardsContainer";
+import CarruselIzquierdo from "../components/CarruselIzquierdo";
+import Footer from "../components/footer";
 
 function Home() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("all");
-  const [sort, setSort] = useState("none");
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -33,17 +32,6 @@ function Home() {
     fetchProducts();
   }, []);
 
-  const filteredProducts = products
-    .filter((p) =>
-      category === "all" ? true : p.category?.toLowerCase() === category
-    )
-    .filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => {
-      if (sort === "price-asc") return a.price - b.price;
-      if (sort === "price-desc") return b.price - a.price;
-      return 0;
-    });
-
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -54,16 +42,19 @@ function Home() {
 
   return (
     <main className="bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <CardsContainer
-          products={filteredProducts}
-          category="Todos nuestros productos"
-        />
+      <div className="flex">
+        <div className="hidden md:block">
+          <CarruselIzquierdo />
+        </div>
+        <div className="max-w-7xl mx-auto  ">
+          <CardsContainer products={products} />
+        </div>
       </div>
 
       {products.length === 0 && !loading && (
         <div className="text-center py-12">No hay productos</div>
       )}
+      <Footer></Footer>
     </main>
   );
 }

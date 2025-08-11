@@ -9,12 +9,14 @@ export default function ProductForm() {
   const [loading, setLoading] = useState(!!id);
   const [product, setProduct] = useState({
     name: "",
+    priceBase: 0,
+    desc: 0,
     price: 0,
     description: "",
     category: "",
     stock: 0,
     image: "",
-    active: true, // Añadido para consistencia
+    active: true,
   });
 
   useEffect(() => {
@@ -24,7 +26,13 @@ export default function ProductForm() {
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-          setProduct(docSnap.data());
+          const data = docSnap.data();
+          // Si el producto existente no tiene priceBase, lo establecemos igual al price
+          setProduct({
+            ...data,
+            priceBase: data.priceBase || data.price,
+            desc: data.desc || 0,
+          });
         }
         setLoading(false);
       };
@@ -35,11 +43,25 @@ export default function ProductForm() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setProduct((prev) => ({
-      ...prev,
-      [name]:
-        name === "price" || name === "stock" ? parseFloat(value) || 0 : value,
-    }));
+
+    setProduct((prev) => {
+      const updatedProduct = {
+        ...prev,
+        [name]:
+          name === "priceBase" || name === "stock" || name === "desc"
+            ? parseFloat(value) || 0
+            : value,
+      };
+
+      // Calcular el precio final cuando cambia priceBase o desc
+      if (name === "priceBase" || name === "desc") {
+        const priceBase = parseFloat(updatedProduct.priceBase) || 0;
+        const desc = parseFloat(updatedProduct.desc) || 0;
+        updatedProduct.price = priceBase - (priceBase * desc) / 100;
+      }
+
+      return updatedProduct;
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -51,6 +73,10 @@ export default function ProductForm() {
         ...product,
         updatedAt: new Date(),
       };
+
+      // Asegurarnos que el precio calculado está actualizado
+      productData.price =
+        product.priceBase - (product.priceBase * product.desc) / 100;
 
       if (id) {
         // Editar producto existente
@@ -109,10 +135,60 @@ export default function ProductForm() {
 
             <div>
               <label
+                htmlFor="priceBase"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Precio Base
+              </label>
+              <div className="mt-1 relative rounded-md shadow-sm">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span className="text-gray-500 sm:text-sm">$</span>
+                </div>
+                <input
+                  type="number"
+                  name="priceBase"
+                  id="priceBase"
+                  value={product.priceBase}
+                  onChange={handleChange}
+                  min="0"
+                  step="0.01"
+                  required
+                  className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md py-2 px-3"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label
+                htmlFor="desc"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Descuento (%)
+              </label>
+              <div className="mt-1 relative rounded-md shadow-sm">
+                <input
+                  type="number"
+                  name="desc"
+                  id="desc"
+                  value={product.desc}
+                  onChange={handleChange}
+                  min="0"
+                  max="100"
+                  step="1"
+                  className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-3 pr-12 sm:text-sm border-gray-300 rounded-md py-2 px-3"
+                />
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  <span className="text-gray-500 sm:text-sm">%</span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label
                 htmlFor="price"
                 className="block text-sm font-medium text-gray-700"
               >
-                Precio
+                Precio Final
               </label>
               <div className="mt-1 relative rounded-md shadow-sm">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -122,14 +198,15 @@ export default function ProductForm() {
                   type="number"
                   name="price"
                   id="price"
-                  value={product.price}
-                  onChange={handleChange}
-                  min="0"
-                  step="0.01"
-                  required
-                  className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md py-2 px-3"
+                  value={product.price.toFixed(2)}
+                  readOnly
+                  className="bg-gray-100 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md py-2 px-3"
                 />
               </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Calculado: ${product.priceBase} - {product.desc}% = $
+                {product.price.toFixed(2)}
+              </p>
             </div>
 
             <div>
