@@ -15,6 +15,24 @@ export default function LoginForm() {
   const [shake, setShake] = useState(false);
   const formRef = useRef(null);
 
+  // 🔹 Mapea códigos de error de Firebase a mensajes claros
+  const mapFirebaseError = (code) => {
+    switch (code) {
+      case "auth/invalid-email":
+        return "El correo no tiene un formato válido.";
+      case "auth/user-not-found":
+        return "No existe una cuenta con ese correo.";
+      case "auth/wrong-password":
+        return "La contraseña es incorrecta.";
+      case "auth/too-many-requests":
+        return "Demasiados intentos fallidos. Intenta más tarde.";
+      case "auth/user-disabled":
+        return "Esta cuenta ha sido deshabilitada.";
+      default:
+        return "Ocurrió un error al iniciar sesión.";
+    }
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -43,11 +61,11 @@ export default function LoginForm() {
     try {
       const success = await loginWithEmail(formData.email, formData.password);
       if (success) navigate("/");
-    } catch (error) {
-      if (error.message.includes("administradores")) {
-        setAdminError(error.message);
+    } catch (err) {
+      if (err.message.includes("administradores")) {
+        setAdminError(err.message);
       } else {
-        setError(error.message);
+        setError(mapFirebaseError(err.code || ""));
       }
       setShake(true);
       setTimeout(() => setShake(false), 500);
@@ -58,11 +76,11 @@ export default function LoginForm() {
     try {
       const success = await loginWithGoogle();
       if (success) navigate("/");
-    } catch (error) {
-      if (error.message.includes("administradores")) {
-        setAdminError(error.message);
+    } catch (err) {
+      if (err.message.includes("administradores")) {
+        setAdminError(err.message);
       } else {
-        setError(error.message);
+        setError(mapFirebaseError(err.code || ""));
       }
       setShake(true);
       setTimeout(() => setShake(false), 500);
@@ -114,7 +132,6 @@ export default function LoginForm() {
           required
           autoComplete="current-password"
           className="border border-gray-300 p-3 w-full rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          aria-describedby="passwordError"
         />
       </div>
 
