@@ -28,7 +28,7 @@ import Favorites from "./pages/Favorites";
 
 function App() {
   const location = useLocation();
-  const hideNavOnPaths = ["/register", "/login", "/loginAdmin"];
+  const hideNavOnPaths = ["/register", "/login", "/login/admin"];
 
   const shouldShowNav = !hideNavOnPaths.includes(location.pathname);
 
