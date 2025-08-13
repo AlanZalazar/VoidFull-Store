@@ -90,7 +90,11 @@ function MisCompras() {
                 <li key={idx} className="flex justify-between">
                   <div className="flex items-center gap-2">
                     <img
-                      src={item.imageUrl}
+                      src={
+                        item.imageUrl ||
+                        item.image ||
+                        "https://via.placeholder.com/80"
+                      }
                       alt={item.name}
                       className="w-12 h-12 object-cover rounded"
                     />
