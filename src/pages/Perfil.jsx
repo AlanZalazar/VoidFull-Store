@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { auth, db } from "../firebase";
 import { doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
+import BackButton from "../Hooks/backButton";
 
 export default function Perfil() {
   const navigate = useNavigate();
@@ -245,7 +246,8 @@ export default function Perfil() {
             </div>
           )}
 
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-5">
+            <BackButton></BackButton>
             <button
               onClick={handleSave}
               disabled={saving}

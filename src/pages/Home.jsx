@@ -41,9 +41,9 @@ function Home() {
   }
 
   return (
-    <main className="bg-gray-50">
+    <main className="bg-gradient-to-b from-gray-100 via-gray-200 to-gray-50">
       <div className="flex">
-        <div className="hidden md:block">
+        <div className="hidden md:block z-50">
           <CarruselIzquierdo />
         </div>
         <div className="max-w-7xl mx-auto  ">

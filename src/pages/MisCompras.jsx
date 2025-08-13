@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { auth, db } from "../firebase";
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
+import BackButton from "../Hooks/backButton";
 
 function MisCompras() {
   const [compras, setCompras] = useState([]);
@@ -57,7 +58,10 @@ function MisCompras() {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">Mis Compras</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold mb-6">Mis Compras</h1>
+        <BackButton></BackButton>
+      </div>
       <div className="space-y-6">
         {compras.map((compra) => (
           <div

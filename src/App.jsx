@@ -27,10 +27,13 @@ import CarruselPage from "./pages/CarruselPage";
 
 function App() {
   const location = useLocation();
+  const hideNavOnPaths = ["/register", "/login", "/loginAdmin"];
+
+  const shouldShowNav = !hideNavOnPaths.includes(location.pathname);
 
   return (
     <>
-      <Navbar />
+      {shouldShowNav && <Navbar />}
       <Routes location={location}>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />

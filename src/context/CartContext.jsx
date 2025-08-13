@@ -14,134 +14,107 @@ const CartContext = createContext();
 export function CartProvider({ children }) {
   const [cartItems, setCartItems] = useState([]);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [hasSynced, setHasSynced] = useState(false); // Nueva bandera de sincronización
+  const [hasSynced, setHasSynced] = useState(false);
 
-  // Función para mezclar carritos sin duplicados
-  const mergeCarts = (localCart, firebaseCart) => {
+  const mergeCarts = useCallback((localCart, firebaseCart) => {
     const merged = [...firebaseCart];
-
     localCart.forEach((localItem) => {
-      const existingIndex = merged.findIndex(
-        (item) => item.id === localItem.id
-      );
-      if (existingIndex >= 0) {
-        // Suma las cantidades si el producto ya existe
-        merged[existingIndex].quantity += localItem.quantity;
+      const index = merged.findIndex((item) => item.id === localItem.id);
+      if (index >= 0) {
+        merged[index].quantity += localItem.quantity;
       } else {
-        // Agrega el producto si no existe
         merged.push(localItem);
       }
     });
-
     return merged;
-  };
+  }, []);
 
-  // Cargar y sincronizar carrito
+  // Cargar carrito
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       try {
         const localCart = JSON.parse(localStorage.getItem("cart")) || [];
-
         if (user) {
           const userCartRef = doc(db, "carts", user.uid);
-          const userCartSnap = await getDoc(userCartRef);
-          let firebaseCart = [];
-
-          if (userCartSnap.exists()) {
-            firebaseCart = userCartSnap.data().items || [];
-          }
-
-          // Solo sincroniza si no se ha hecho antes
+          const snap = await getDoc(userCartRef);
+          const firebaseCart = snap.exists() ? snap.data().items || [] : [];
           if (!hasSynced && localCart.length > 0) {
-            const mergedCart = mergeCarts(localCart, firebaseCart);
-            setCartItems(mergedCart);
-            await setDoc(userCartRef, { items: mergedCart });
+            const merged = mergeCarts(localCart, firebaseCart);
+            setCartItems(merged);
+            await setDoc(userCartRef, { items: merged });
             localStorage.removeItem("cart");
-            setHasSynced(true); // Marca como sincronizado
+            setHasSynced(true);
           } else {
             setCartItems(firebaseCart);
           }
         } else {
           setCartItems(localCart);
         }
-      } catch (error) {
-        console.error("Error syncing cart:", error);
+      } catch (err) {
+        console.error("Error syncing cart:", err);
       } finally {
         setIsLoaded(true);
       }
     });
-
     return unsubscribe;
-  }, [hasSynced]);
+  }, [hasSynced, mergeCarts]);
 
-  // Persistir cambios
+  // Guardar cambios
   useEffect(() => {
     if (!isLoaded) return;
-
     const saveCart = async () => {
       try {
         if (auth.currentUser) {
-          const userCartRef = doc(db, "carts", auth.currentUser.uid);
-          await setDoc(userCartRef, { items: cartItems });
+          const ref = doc(db, "carts", auth.currentUser.uid);
+          await setDoc(ref, { items: cartItems });
         } else {
           localStorage.setItem("cart", JSON.stringify(cartItems));
         }
-      } catch (error) {
-        console.error("Error saving cart:", error);
+      } catch (err) {
+        console.error("Error saving cart:", err);
       }
     };
-
     saveCart();
   }, [cartItems, isLoaded]);
 
-  // 3. Funciones del carrito
-  const addToCart = useCallback(async (product) => {
-    setCartItems((prevItems) => {
-      const existingItem = prevItems.find((item) => item.id === product.id);
-      let newItems;
-
-      if (existingItem) {
-        newItems = prevItems.map((item) =>
-          item.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
+  const addToCart = useCallback((product) => {
+    setCartItems((prev) => {
+      const existing = prev.find((i) => i.id === product.id);
+      if (existing) {
+        return prev.map((i) =>
+          i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i
         );
-      } else {
-        newItems = [...prevItems, { ...product, quantity: 1 }];
       }
-
-      return newItems;
+      return [...prev, { ...product, quantity: 1 }];
     });
   }, []);
 
-  const removeFromCart = useCallback(async (productId) => {
-    setCartItems((prevItems) =>
-      prevItems.filter((item) => item.id !== productId)
-    );
+  const removeFromCart = useCallback((id) => {
+    setCartItems((prev) => prev.filter((i) => i.id !== id));
   }, []);
 
-  const updateQuantity = useCallback(async (productId, newQuantity) => {
-    if (newQuantity < 1) return;
-
-    setCartItems((prevItems) =>
-      prevItems.map((item) =>
-        item.id === productId
-          ? { ...item, quantity: Math.max(1, Math.floor(newQuantity)) }
-          : item
+  const updateQuantity = useCallback((id, qty) => {
+    if (qty < 1) return;
+    setCartItems((prev) =>
+      prev.map((i) =>
+        i.id === id ? { ...i, quantity: Math.max(1, Math.floor(qty)) } : i
       )
     );
   }, []);
 
   const clearCart = useCallback(async () => {
     setCartItems([]);
+    if (auth.currentUser) {
+      const ref = doc(db, "carts", auth.currentUser.uid);
+      await setDoc(ref, { items: [] });
+    }
+    localStorage.removeItem("cart");
   }, []);
 
-  // 4. Valores calculados
   const cartTotal = cartItems.reduce(
     (total, item) => total + item.price * item.quantity,
     0
   );
-
   const itemCount = cartItems.reduce((count, item) => count + item.quantity, 0);
 
   return (
@@ -151,19 +124,9 @@ export function CartProvider({ children }) {
         addToCart,
         removeFromCart,
         updateQuantity,
-        clearCart: async () => {
-          setCartItems([]);
-          if (auth.currentUser) {
-            const userCartRef = doc(db, "carts", auth.currentUser.uid);
-            await setDoc(userCartRef, { items: [] });
-          }
-          localStorage.removeItem("cart");
-        },
-        cartTotal: cartItems.reduce(
-          (total, item) => total + item.price * item.quantity,
-          0
-        ),
-        itemCount: cartItems.reduce((count, item) => count + item.quantity, 0),
+        clearCart,
+        cartTotal,
+        itemCount,
         isCartLoaded: isLoaded,
       }}
     >
@@ -172,4 +135,6 @@ export function CartProvider({ children }) {
   );
 }
 
-export const useCart = () => useContext(CartContext);
+export const useCart = () => {
+  return useContext(CartContext);
+};

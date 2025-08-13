@@ -38,6 +38,10 @@ export default function AdminCarruselEditor() {
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [originalPrices, setOriginalPrices] = useState({});
+  const [applyingDiscount, setApplyingDiscount] = useState(false);
+  const [resettingDiscounts, setResettingDiscounts] = useState(false);
+  const [savingChanges, setSavingChanges] = useState(false);
+  const [revertingChanges, setRevertingChanges] = useState(false);
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -115,26 +119,34 @@ export default function AdminCarruselEditor() {
   const addProduct = async (productId) => {
     if (!productId || carrusel.products.includes(productId)) return;
 
-    // Aplicar descuento al producto cuando se agrega
-    if (carrusel.discount > 0) {
-      await applyDiscountToProduct(productId, carrusel.discount);
-    }
+    try {
+      // Aplicar descuento al producto cuando se agrega
+      if (carrusel.discount > 0) {
+        await applyDiscountToProduct(productId, carrusel.discount);
+      }
 
-    handleChange("products", [...carrusel.products, productId]);
-    setSearchTerm("");
-    setShowDropdown(false);
-    toast.success("Producto agregado (pendiente de guardar)");
+      handleChange("products", [...carrusel.products, productId]);
+      setSearchTerm("");
+      setShowDropdown(false);
+      toast.success("Producto agregado al carrusel");
+    } catch (error) {
+      toast.error("Error al agregar producto");
+    }
   };
 
   const removeProduct = async (productId) => {
-    // Restaurar precio original cuando se quita del carrusel
-    await restoreOriginalPrice(productId);
+    try {
+      // Restaurar precio original cuando se quita del carrusel
+      await restoreOriginalPrice(productId);
 
-    handleChange(
-      "products",
-      carrusel.products.filter((id) => id !== productId)
-    );
-    toast.success("Producto removido (pendiente de guardar)");
+      handleChange(
+        "products",
+        carrusel.products.filter((id) => id !== productId)
+      );
+      toast.success("Producto removido del carrusel");
+    } catch (error) {
+      toast.error("Error al remover producto");
+    }
   };
 
   // Aplicar descuento a un producto
@@ -145,18 +157,19 @@ export default function AdminCarruselEditor() {
 
     if (!product || originalPrice === undefined) return;
 
-    const discountedPrice = originalPrice * (1 - discount / 100);
-
     try {
       await updateDoc(productRef, {
-        price: discountedPrice,
-        priceColor: "#ef4444",
-        originalPrice: originalPrice,
-        hasDiscount: true,
+        desc: discount,
+        price: originalPrice * (1 - discount / 100),
+        priceColor:
+          discount > 0
+            ? "#ef4444"
+            : originalPrices[productId]?.originalPriceColor || "inherit",
+        hasDiscount: discount > 0,
+        priceBase: originalPrice,
       });
     } catch (err) {
-      toast.error(`Error al aplicar descuento al producto ${product.name}`);
-      console.error(err);
+      throw err;
     }
   };
 
@@ -169,14 +182,14 @@ export default function AdminCarruselEditor() {
 
     try {
       await updateDoc(productRef, {
+        desc: 0,
         price: originalPrice,
         priceColor: originalPrices[productId]?.originalPriceColor || "inherit",
         hasDiscount: false,
-        originalPrice: originalPrice,
+        priceBase: originalPrice,
       });
     } catch (err) {
-      toast.error("Error al restaurar precio original");
-      console.error(err);
+      throw err;
     }
   };
 
@@ -187,34 +200,32 @@ export default function AdminCarruselEditor() {
       return;
     }
 
+    setApplyingDiscount(true);
     const batch = writeBatch(db);
 
     try {
+      // Actualizar el descuento en el carrusel
+      const carruselRef = doc(db, "components", "carruselIzquierdo");
+      batch.update(carruselRef, {
+        discount: carrusel.discount,
+      });
+
+      // Actualizar cada producto en el carrusel
       for (const productId of carrusel.products) {
         const productRef = doc(db, "products", productId);
         const originalPrice = originalPrices[productId]?.originalPrice;
 
         if (originalPrice !== undefined) {
-          if (carrusel.discount > 0) {
-            // Aplicar nuevo descuento sobre el precio ORIGINAL
-            const discountedPrice =
-              originalPrice * (1 - carrusel.discount / 100);
-            batch.update(productRef, {
-              price: discountedPrice,
-              priceColor: "#ef4444",
-              originalPrice: originalPrice,
-              hasDiscount: true,
-            });
-          } else {
-            // Restaurar precio original si el descuento es 0%
-            batch.update(productRef, {
-              price: originalPrice,
-              priceColor:
-                originalPrices[productId]?.originalPriceColor || "inherit",
-              hasDiscount: false,
-              originalPrice: originalPrice,
-            });
-          }
+          batch.update(productRef, {
+            desc: carrusel.discount,
+            price: originalPrice * (1 - carrusel.discount / 100),
+            priceColor:
+              carrusel.discount > 0
+                ? "#ef4444"
+                : originalPrices[productId]?.originalPriceColor || "inherit",
+            hasDiscount: carrusel.discount > 0,
+            priceBase: originalPrice,
+          });
         }
       }
 
@@ -222,37 +233,41 @@ export default function AdminCarruselEditor() {
       toast.success(
         carrusel.discount > 0
           ? `Descuento del ${carrusel.discount}% aplicado correctamente`
-          : "Descuento removido correctamente"
+          : "Descuentos removidos correctamente"
       );
     } catch (err) {
       toast.error("Error al aplicar descuentos");
       console.error(err);
+    } finally {
+      setApplyingDiscount(false);
     }
   };
 
   // Restablecer completamente los descuentos
   const resetDiscounts = async () => {
+    setResettingDiscounts(true);
     const batch = writeBatch(db);
 
     try {
-      // Actualizar el carrusel para establecer descuento a 0
+      // Actualizar el carrusel
       const carruselRef = doc(db, "components", "carruselIzquierdo");
       batch.update(carruselRef, {
         discount: 0,
       });
 
-      // Restaurar precios originales de todos los productos
+      // Actualizar todos los productos del carrusel
       for (const productId of carrusel.products) {
         const productRef = doc(db, "products", productId);
         const originalPrice = originalPrices[productId]?.originalPrice;
 
         if (originalPrice !== undefined) {
           batch.update(productRef, {
+            desc: 0,
             price: originalPrice,
             priceColor:
               originalPrices[productId]?.originalPriceColor || "inherit",
             hasDiscount: false,
-            originalPrice: originalPrice,
+            priceBase: originalPrice,
           });
         }
       }
@@ -263,11 +278,14 @@ export default function AdminCarruselEditor() {
     } catch (err) {
       toast.error("Error al restablecer descuentos");
       console.error(err);
+    } finally {
+      setResettingDiscounts(false);
     }
   };
 
   // Guardar cambios en Firebase
   const saveChanges = async () => {
+    setSavingChanges(true);
     try {
       const batch = writeBatch(db);
 
@@ -287,39 +305,36 @@ export default function AdminCarruselEditor() {
         const originalPrice = originalPrices[productId]?.originalPrice;
 
         if (originalPrice !== undefined) {
-          if (carrusel.discount > 0) {
-            const discountedPrice =
-              originalPrice * (1 - carrusel.discount / 100);
-            batch.update(productRef, {
-              price: discountedPrice,
-              priceColor: "#ef4444",
-              originalPrice: originalPrice,
-              hasDiscount: true,
-            });
-          } else {
-            batch.update(productRef, {
-              price: originalPrice,
-              priceColor:
-                originalPrices[productId]?.originalPriceColor || "inherit",
-              hasDiscount: false,
-              originalPrice: originalPrice,
-            });
-          }
+          batch.update(productRef, {
+            desc: carrusel.discount,
+            price: originalPrice * (1 - carrusel.discount / 100),
+            priceColor:
+              carrusel.discount > 0
+                ? "#ef4444"
+                : originalPrices[productId]?.originalPriceColor || "inherit",
+            hasDiscount: carrusel.discount > 0,
+            priceBase: originalPrice,
+          });
         }
       }
 
       await batch.commit();
       setOriginalData(carrusel);
-      toast.success("Cambios guardados exitosamente!");
+      toast.success("¡Todos los cambios se guardaron exitosamente!");
     } catch (err) {
       toast.error("Error al guardar los cambios");
       console.error(err);
+    } finally {
+      setSavingChanges(false);
     }
   };
 
   // Revertir cambios
   const revertChanges = async () => {
-    if (originalData) {
+    if (!originalData) return;
+
+    setRevertingChanges(true);
+    try {
       // Restaurar precios de los productos que ya no están en el carrusel
       const productsToRestore = carrusel.products.filter(
         (id) => !originalData.products.includes(id)
@@ -337,7 +352,12 @@ export default function AdminCarruselEditor() {
       }
 
       setCarrusel(originalData);
-      toast.success("Cambios revertidos");
+      toast.success("Cambios revertidos correctamente");
+    } catch (err) {
+      toast.error("Error al revertir cambios");
+      console.error(err);
+    } finally {
+      setRevertingChanges(false);
     }
   };
 
@@ -365,7 +385,7 @@ export default function AdminCarruselEditor() {
           <div className="flex justify-between items-center">
             <button
               onClick={() => navigate(-1)}
-              className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-all"
+              className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-all active:scale-95"
             >
               <FiArrowLeft /> Volver
             </button>
@@ -444,19 +464,44 @@ export default function AdminCarruselEditor() {
                   />
                   <FiPercent className="absolute left-3 top-2.5 text-gray-400" />
                 </div>
-                <button
+                <motion.button
                   onClick={applyDiscountToAll}
-                  className="px-4 py-2 rounded-lg flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white transition"
+                  whileTap={{ scale: 0.95 }}
+                  disabled={applyingDiscount}
+                  className={`px-4 py-2 rounded-lg flex items-center gap-2 text-white transition ${
+                    applyingDiscount
+                      ? "bg-green-700"
+                      : "bg-green-600 hover:bg-green-700"
+                  }`}
                 >
-                  <FiSave size={16} /> Aplicar
-                </button>
-                <button
+                  {applyingDiscount ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Aplicando...
+                    </>
+                  ) : (
+                    <>
+                      <FiSave size={16} /> Aplicar
+                    </>
+                  )}
+                </motion.button>
+                <motion.button
                   onClick={resetDiscounts}
-                  className="p-2 rounded-lg flex items-center gap-2 bg-gray-200 hover:bg-gray-300 transition"
+                  whileTap={{ scale: 0.95 }}
+                  disabled={resettingDiscounts}
+                  className={`p-2 rounded-lg flex items-center gap-2 transition ${
+                    resettingDiscounts
+                      ? "bg-gray-300"
+                      : "bg-gray-200 hover:bg-gray-300"
+                  }`}
                   title="Restablecer descuentos"
                 >
-                  <FiRotateCcw size={16} />
-                </button>
+                  {resettingDiscounts ? (
+                    <div className="w-4 h-4 border-2 border-gray-600 border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <FiRotateCcw size={16} />
+                  )}
+                </motion.button>
               </div>
               <p className="text-sm text-gray-500">
                 El descuento se aplicará sobre el precio original. Precios con
@@ -594,12 +639,13 @@ export default function AdminCarruselEditor() {
                             </div>
                           </div>
                         </div>
-                        <button
+                        <motion.button
                           onClick={() => removeProduct(productId)}
+                          whileTap={{ scale: 0.9 }}
                           className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition"
                         >
                           <FiTrash2 />
-                        </button>
+                        </motion.button>
                       </motion.li>
                     );
                   })}
@@ -611,28 +657,48 @@ export default function AdminCarruselEditor() {
 
         {/* Barra de acciones */}
         <div className="bg-gray-50 px-6 py-4 border-t flex justify-between">
-          <button
+          <motion.button
             onClick={revertChanges}
-            disabled={!hasChanges}
+            disabled={!hasChanges || revertingChanges}
+            whileTap={{ scale: !hasChanges || revertingChanges ? 1 : 0.95 }}
             className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
-              hasChanges
+              hasChanges && !revertingChanges
                 ? "bg-gray-200 hover:bg-gray-300"
                 : "bg-gray-100 text-gray-400 cursor-not-allowed"
             } transition`}
           >
-            <FiArrowLeft /> Revertir
-          </button>
-          <button
+            {revertingChanges ? (
+              <>
+                <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                Revertiendo...
+              </>
+            ) : (
+              <>
+                <FiArrowLeft /> Revertir
+              </>
+            )}
+          </motion.button>
+          <motion.button
             onClick={saveChanges}
-            disabled={!hasChanges}
+            disabled={!hasChanges || savingChanges}
+            whileTap={{ scale: !hasChanges || savingChanges ? 1 : 0.95 }}
             className={`px-6 py-2 rounded-lg flex items-center gap-2 text-white ${
-              hasChanges
+              hasChanges && !savingChanges
                 ? "bg-blue-600 hover:bg-blue-700"
                 : "bg-blue-400 cursor-not-allowed"
             } transition`}
           >
-            <FiSave /> Guardar Cambios
-          </button>
+            {savingChanges ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Guardando...
+              </>
+            ) : (
+              <>
+                <FiSave /> Guardar Cambios
+              </>
+            )}
+          </motion.button>
         </div>
       </div>
     </motion.div>

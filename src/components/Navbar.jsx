@@ -12,8 +12,8 @@ const NavBar = () => {
   const { cartItems = [] } = useCart();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [userInitials, setUserInitials] = useState("");
-  const [userFirstName, setUserFirstName] = useState("");
-  const [userData, setUserData] = useState(null);
+  const [userDisplayName, setUserDisplayName] = useState("");
+  const [userRole, setUserRole] = useState("user");
   const menuRef = useRef(null);
   const navigate = useNavigate();
 
@@ -37,37 +37,36 @@ const NavBar = () => {
   // Obtener datos del usuario
   useEffect(() => {
     const fetchUserData = async () => {
-      if (user?.uid) {
-        try {
-          // 1. Intenta obtener de Firebase Auth primero
-          if (user.displayName) {
-            const [firstName] = user.displayName.split(" ");
-            setUserFirstName(firstName);
-            setUserInitials(firstName[0].toUpperCase());
-            return;
-          }
+      if (!user?.uid) return;
 
-          // 2. Si no, busca en Firestore
-          const userDoc = await getDoc(doc(db, "users", user.uid));
-          if (userDoc.exists()) {
-            const data = userDoc.data();
-            setUserData(data);
+      // 1. Primero usa los datos de Firebase Auth
+      if (user.displayName) {
+        const [firstName] = user.displayName.split(" ");
+        setUserDisplayName(user.displayName);
+        setUserInitials(firstName[0].toUpperCase());
+      } else if (user.email) {
+        const emailName = user.email.split("@")[0];
+        setUserDisplayName(emailName);
+        setUserInitials(emailName[0].toUpperCase());
+      }
 
-            // Prioridad: firstName > name > email
+      // 2. Luego intenta obtener datos adicionales de Firestore
+      try {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          setUserRole(data.role || "user");
+
+          // Actualiza el nombre solo si no tenemos uno de Auth
+          if (!user.displayName) {
             const nameToUse =
               data.firstName || data.name || user.email.split("@")[0];
-            setUserFirstName(nameToUse);
+            setUserDisplayName(nameToUse);
             setUserInitials(nameToUse[0].toUpperCase());
           }
-        } catch (error) {
-          console.error("Error fetching user data:", error);
-          // Fallback al email
-          if (user.email) {
-            const emailName = user.email.split("@")[0];
-            setUserFirstName(emailName);
-            setUserInitials(emailName[0].toUpperCase());
-          }
         }
+      } catch (error) {
+        console.error("Error fetching user data:", error);
       }
     };
 
@@ -79,47 +78,38 @@ const NavBar = () => {
     if (res.success) navigate("/login");
   };
 
-  // Función para obtener el nombre a mostrar
-  const getDisplayName = () => {
-    if (user?.displayName) return user.displayName;
-    if (userData?.firstName) return userData.firstName;
-    if (userData?.name) return userData.name;
-    return user?.email?.split("@")[0] || "Usuario";
-  };
-
   return (
     <nav className="sticky top-0 z-50 px-6 py-3 bg-gradient-to-r from-cyan-500/10 via-purple-500/10 to-pink-500/10 backdrop-blur-md border-b border-white/20 shadow-lg shadow-cyan-500/10">
       <div className="max-w-8xl mx-auto flex items-center justify-between">
         {/* Logo y nombre */}
         <Link to="/" className="flex items-center gap-2 group">
           <img src="/logo.png" alt="logo" className="h-10" />
-          <span className="text-2xl font-bold bg-gradient-to-r from-cyan-500 to-pink-500 bg-clip-text text-transparent group-hover:from-pink-500 group-hover:to-cyan-500 transition-all duration-500">
+          <span className=" text-2xl font-bold bg-gradient-to-r from-cyan-500 to-pink-500 bg-clip-text text-transparent group-hover:from-pink-500 group-hover:to-cyan-500 transition-all duration-500">
             VoidFull-Store
           </span>
         </Link>
 
         <div className="flex items-center gap-6">
-          {/* Carrito con mejor contraste */}
-          <Link to="/cart" className="relative group">
-            <div className="p-2 rounded-full bg-white/30 group-hover:bg-white/40 transition-all duration-300">
-              <ShoppingCartIcon className="h-6 w-6 text-gray-800" />
-            </div>
-            {totalCartItems > 0 && (
-              <span className="absolute -top-1 -right-1 bg-cyan-600 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center animate-bounce">
-                {totalCartItems}
-              </span>
-            )}
-          </Link>
+          {/* Carrito - Solo visible si no es admin */}
+          {userRole !== "admin" && (
+            <Link to="/cart" className="relative group">
+              <div className="p-2 rounded-full bg-white/30 group-hover:bg-white/40 transition-all duration-300">
+                <ShoppingCartIcon className="h-6 w-6 text-gray-800" />
+              </div>
+              {totalCartItems > 0 && (
+                <span className="absolute -top-1 -right-1 bg-cyan-600 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center animate-bounce">
+                  {totalCartItems}
+                </span>
+              )}
+            </Link>
+          )}
 
           {/* Usuario */}
           {user ? (
             <div className="relative flex items-center gap-4" ref={menuRef}>
-              {/* Saludo personalizado con mejor contraste */}
+              {/* Saludo personalizado */}
               <div className="hidden md:block text-sm font-medium text-gray-800">
-                Hola,{" "}
-                <span className="font-bold">
-                  {userFirstName || getDisplayName()}
-                </span>
+                Hola, <span className="font-bold">{userDisplayName}</span>
               </div>
 
               <div className="relative">
@@ -137,7 +127,7 @@ const NavBar = () => {
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl py-2 z-50 border border-white/20 backdrop-blur-md overflow-hidden">
                     <div className="px-4 py-3 border-b border-white/10">
                       <p className="text-sm font-medium text-gray-900">
-                        {getDisplayName()} {userData.lastName}
+                        {userDisplayName}
                       </p>
                       <p className="text-xs text-gray-500 truncate">
                         {user.email}
@@ -145,7 +135,7 @@ const NavBar = () => {
                     </div>
 
                     <div className="py-1">
-                      {user.role === "admin" && (
+                      {userRole === "admin" && (
                         <>
                           <button
                             onClick={() => {
@@ -173,7 +163,7 @@ const NavBar = () => {
                             className="flex items-center w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-100 transition-all duration-200"
                           >
                             <FiEye className="h-4 w-4 mr-2 text-blue-500" />
-                            Ver como cliente
+                            Ver Home
                           </button>
                         </>
                       )}
@@ -189,16 +179,19 @@ const NavBar = () => {
                         Mi perfil
                       </button>
 
-                      <button
-                        onClick={() => {
-                          navigate("/mis-compras");
-                          setIsProfileOpen(false);
-                        }}
-                        className="flex items-center w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-100 transition-all duration-200"
-                      >
-                        <FiShoppingBag className="h-4 w-4 mr-2 text-purple-500" />
-                        Mis compras
-                      </button>
+                      {/* Ocultar "Mis compras" si es admin */}
+                      {userRole !== "admin" && (
+                        <button
+                          onClick={() => {
+                            navigate("/mis-compras");
+                            setIsProfileOpen(false);
+                          }}
+                          className="flex items-center w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-100 transition-all duration-200"
+                        >
+                          <FiShoppingBag className="h-4 w-4 mr-2 text-purple-500" />
+                          Mis compras
+                        </button>
+                      )}
 
                       <button
                         onClick={handleLogout}
@@ -216,13 +209,13 @@ const NavBar = () => {
             <div className="flex gap-3">
               <Link
                 to="/login"
-                className="px-4 py-2 text-sm font-medium rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-blue-500 hover:to-cyan-500 transition-all duration-300 shadow-md"
+                className="px-4 py-2 text-sm font-medium rounded-lg bg-gradient-to-r from-purple-500 to-violet-500 text-white hover:from-violet-500 hover:to-purple-500 transition-all duration-300 shadow-md"
               >
                 Iniciar sesión
               </Link>
               <Link
                 to="/register"
-                className="px-4 py-2 text-sm font-medium rounded-lg bg-white/20 text-white hover:bg-white/30 transition-all duration-300 shadow-md"
+                className="px-4 py-2 text-sm font-medium rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-blue-500 hover:to-cyan-500 transition-all duration-300 shadow-md"
               >
                 Registrarse
               </Link>

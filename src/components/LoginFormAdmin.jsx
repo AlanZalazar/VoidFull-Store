@@ -152,7 +152,7 @@ export default function LoginFormAdmin() {
         disabled={loading}
         className="w-full border border-gray-300 py-2 px-4 rounded-md flex items-center justify-center gap-2 hover:bg-gray-50 transition disabled:opacity-50"
       >
-        <img src="./logoogle.png" alt="Google logo" className="w-5 h-5" />
+        <img src="/logoogle.png" alt="Google logo" className="w-5 h-5" />
         {loading ? "Conectando..." : "Acceso con Google (Admin)"}
       </button>
 

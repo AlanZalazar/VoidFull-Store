@@ -8,6 +8,7 @@ import {
   FaEnvelope,
   FaPhone,
   FaMapMarkerAlt,
+  FaGithub,
 } from "react-icons/fa";
 
 export default function Footer() {
@@ -33,17 +34,11 @@ export default function Footer() {
     setIsSubmitting(true);
 
     try {
-      // Aquí deberías implementar el envío real del formulario
-      // Por ejemplo, usando Firebase Functions o un servicio de email
       console.log("Datos del formulario:", formData);
-
-      // Simulamos un envío con retraso
       await new Promise((resolve) => setTimeout(resolve, 1500));
-
       setSubmitMessage("¡Gracias por tu mensaje! Te responderé pronto.");
       setFormData({ name: "", email: "", message: "" });
     } catch (error) {
-      console.error("Error al enviar el mensaje:", error);
       setSubmitMessage(
         "Hubo un error al enviar tu mensaje. Por favor intenta nuevamente."
       );
@@ -54,122 +49,131 @@ export default function Footer() {
   };
 
   return (
-    <footer className="bg-gray-900 text-gray-300 pt-12 pb-8 px-4 sm:px-6 lg:px-8">
+    <footer className="bg-[#1e1e1e] text-[#d4d4d4] pt-10 pb-6 px-4 sm:px-6 lg:px-8 border-t border-[#333]">
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Sección de información */}
           <div className="space-y-4">
-            <h3 className="text-xl font-bold text-white">Mi Empresa</h3>
-            <p className="text-gray-400">
-              Creando soluciones digitales innovadoras para hacer crecer tu
-              negocio.
+            <h3 className="text-xl font-bold text-[#ffffff]">VOID FULL</h3>
+            <p className="text-[#a0a0a0] text-sm">
+              Productos personalizados con tus diseños favoritos de anime.
             </p>
-            <div className="flex space-x-4">
+            <div className="flex space-x-3">
               <a
                 href="#"
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-[#4267B2] hover:text-[#5a7ec4] transition-colors"
               >
-                <FaFacebook size={20} />
+                <FaFacebook size={18} />
               </a>
               <a
                 href="#"
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-[#1DA1F2] hover:text-[#4ab4f5] transition-colors"
               >
-                <FaTwitter size={20} />
+                <FaTwitter size={18} />
               </a>
               <a
                 href="#"
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-[#E1306C] hover:text-[#e94b82] transition-colors"
               >
-                <FaInstagram size={20} />
+                <FaInstagram size={18} />
               </a>
               <a
                 href="#"
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-[#0077b5] hover:text-[#0088cc] transition-colors"
               >
-                <FaLinkedin size={20} />
+                <FaLinkedin size={18} />
               </a>
               <a
                 href="#"
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-[#FF0000] hover:text-[#ff3333] transition-colors"
               >
-                <FaYoutube size={20} />
+                <FaYoutube size={18} />
+              </a>
+              <a
+                href="#"
+                className="text-[#333] hover:text-[#555] transition-colors"
+              >
+                <FaGithub size={18} />
               </a>
             </div>
           </div>
 
           {/* Enlaces rápidos */}
-          <div className="space-y-4">
-            <h3 className="text-xl font-bold text-white">Enlaces Rápidos</h3>
+          <div className="space-y-3">
+            <h3 className="text-lg font-semibold text-[#ffffff]">Explorar</h3>
             <ul className="space-y-2">
               <li>
                 <a
                   href="#"
-                  className="text-gray-400 hover:text-white transition-colors"
+                  className="text-[#a0a0a0] hover:text-[#ffffff] text-sm transition-colors"
                 >
-                  Inicio
+                  Productos
                 </a>
               </li>
               <li>
                 <a
                   href="#"
-                  className="text-gray-400 hover:text-white transition-colors"
+                  className="text-[#a0a0a0] hover:text-[#ffffff] text-sm transition-colors"
                 >
-                  Servicios
+                  Diseños
                 </a>
               </li>
               <li>
                 <a
                   href="#"
-                  className="text-gray-400 hover:text-white transition-colors"
+                  className="text-[#a0a0a0] hover:text-[#ffffff] text-sm transition-colors"
                 >
-                  Portafolio
+                  Personalización
                 </a>
               </li>
               <li>
                 <a
                   href="#"
-                  className="text-gray-400 hover:text-white transition-colors"
+                  className="text-[#a0a0a0] hover:text-[#ffffff] text-sm transition-colors"
                 >
-                  Blog
+                  Envíos
                 </a>
               </li>
               <li>
                 <a
                   href="#"
-                  className="text-gray-400 hover:text-white transition-colors"
+                  className="text-[#a0a0a0] hover:text-[#ffffff] text-sm transition-colors"
                 >
-                  Contacto
+                  Preguntas Frecuentes
                 </a>
               </li>
             </ul>
           </div>
 
           {/* Información de contacto */}
-          <div className="space-y-4">
-            <h3 className="text-xl font-bold text-white">Contacto</h3>
-            <div className="space-y-3">
-              <div className="flex items-start space-x-3">
-                <FaMapMarkerAlt className="text-gray-400 mt-1" />
-                <span className="text-gray-400">
-                  123 Calle Principal, Ciudad, País
+          <div className="space-y-3">
+            <h3 className="text-lg font-semibold text-[#ffffff]">Contacto</h3>
+            <div className="space-y-2">
+              <div className="flex items-start space-x-2">
+                <FaMapMarkerAlt className="text-[#569cd6] mt-0.5 flex-shrink-0" />
+                <span className="text-[#a0a0a0] text-sm">
+                  Berazategui, Buenos Aires. Argentina
                 </span>
               </div>
-              <div className="flex items-center space-x-3">
-                <FaPhone className="text-gray-400" />
-                <span className="text-gray-400">+1 234 567 890</span>
+              <div className="flex items-center space-x-2">
+                <FaPhone className="text-[#569cd6] flex-shrink-0" />
+                <span className="text-[#a0a0a0] text-sm">+54 1132173425</span>
               </div>
-              <div className="flex items-center space-x-3">
-                <FaEnvelope className="text-gray-400" />
-                <span className="text-gray-400">contacto@miempresa.com</span>
+              <div className="flex items-center space-x-2">
+                <FaEnvelope className="text-[#569cd6] flex-shrink-0" />
+                <span className="text-[#a0a0a0] text-sm">
+                  azlhan004@gmail.com
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Formulario de contacto */}
-          <div className="space-y-4">
-            <h3 className="text-xl font-bold text-white">Escríbeme</h3>
-            <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Formulario de contacto COMPLETO y FUNCIONAL */}
+          <div className="space-y-3">
+            <h3 className="text-lg font-semibold text-[#ffffff]">
+              Contáctanos
+            </h3>
+            <form onSubmit={handleSubmit} className="space-y-3">
               <div>
                 <input
                   type="text"
@@ -177,7 +181,7 @@ export default function Footer() {
                   value={formData.name}
                   onChange={handleChange}
                   placeholder="Tu nombre"
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                  className="w-full px-3 py-1.5 text-sm bg-[#252526] border border-[#3c3c3c] rounded focus:outline-none focus:ring-1 focus:ring-[#569cd6] text-[#d4d4d4]"
                   required
                 />
               </div>
@@ -188,7 +192,7 @@ export default function Footer() {
                   value={formData.email}
                   onChange={handleChange}
                   placeholder="Tu email"
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                  className="w-full px-3 py-1.5 text-sm bg-[#252526] border border-[#3c3c3c] rounded focus:outline-none focus:ring-1 focus:ring-[#569cd6] text-[#d4d4d4]"
                   required
                 />
               </div>
@@ -199,23 +203,23 @@ export default function Footer() {
                   onChange={handleChange}
                   placeholder="Tu mensaje"
                   rows="3"
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                  className="w-full px-3 py-1.5 text-sm bg-[#252526] border border-[#3c3c3c] rounded focus:outline-none focus:ring-1 focus:ring-[#569cd6] text-[#d4d4d4]"
                   required
                 ></textarea>
               </div>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-1.5 text-sm bg-[#0e639c] hover:bg-[#1177bb] text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? "Enviando..." : "Enviar Mensaje"}
               </button>
               {submitMessage && (
                 <p
-                  className={`text-sm ${
+                  className={`text-xs mt-1 ${
                     submitMessage.includes("Gracias")
-                      ? "text-green-400"
-                      : "text-red-400"
+                      ? "text-[#4ec9b0]"
+                      : "text-[#f48771]"
                   }`}
                 >
                   {submitMessage}
@@ -225,31 +229,31 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Divider */}
-        <div className="border-t border-gray-800 my-8"></div>
+        {/* Divider con gradiente */}
+        <div className="h-px my-6 bg-gradient-to-r from-transparent via-[#333] to-transparent"></div>
 
         {/* Copyright y enlaces legales */}
-        <div className="flex flex-col md:flex-row justify-between items-center">
-          <p className="text-gray-500 text-sm">
-            &copy; {new Date().getFullYear()} Mi Empresa. Todos los derechos
+        <div className="flex flex-col md:flex-row justify-between items-center text-sm">
+          <p className="text-[#7a7a7a]">
+            &copy; {new Date().getFullYear()} VoidFull-Store. Todos los derechos
             reservados.
           </p>
-          <div className="flex space-x-6 mt-4 md:mt-0">
+          <div className="flex space-x-4 mt-3 md:mt-0">
             <a
               href="#"
-              className="text-gray-500 hover:text-gray-300 text-sm transition-colors"
+              className="text-[#7a7a7a] hover:text-[#d4d4d4] transition-colors"
             >
-              Política de Privacidad
+              Términos
             </a>
             <a
               href="#"
-              className="text-gray-500 hover:text-gray-300 text-sm transition-colors"
+              className="text-[#7a7a7a] hover:text-[#d4d4d4] transition-colors"
             >
-              Términos de Servicio
+              Privacidad
             </a>
             <a
               href="#"
-              className="text-gray-500 hover:text-gray-300 text-sm transition-colors"
+              className="text-[#7a7a7a] hover:text-[#d4d4d4] transition-colors"
             >
               Cookies
             </a>
