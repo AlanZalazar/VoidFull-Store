@@ -15,6 +15,8 @@ import {
   doc,
   getDoc,
   limit,
+  arrayUnion,
+  updateDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
 
@@ -28,7 +30,39 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  // Observador de estado de autenticación
+  // 🔹 Actualizar datos del usuario desde Firestore
+  const updateUserData = async (firebaseUser) => {
+    const userRef = doc(db, "users", firebaseUser.uid);
+    const userDoc = await getDoc(userRef);
+    if (userDoc.exists()) {
+      return userDoc.data();
+    }
+    return null;
+  };
+
+  // 🔹 Fusionar favoritos locales con los de Firestore
+  const mergeFavorites = async (firebaseUser) => {
+    const localFavs = JSON.parse(localStorage.getItem("favorites") || "[]");
+
+    const userRef = doc(db, "users", firebaseUser.uid);
+    const snap = await getDoc(userRef);
+
+    if (snap.exists()) {
+      const firestoreFavs = snap.data().favorites || [];
+      const merged = [...new Set([...firestoreFavs, ...localFavs])];
+
+      if (merged.length !== firestoreFavs.length) {
+        await updateDoc(userRef, { favorites: merged });
+      }
+
+      localStorage.removeItem("favorites");
+      return merged;
+    }
+
+    return localFavs;
+  };
+
+  // 🔹 Observador de estado de autenticación
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
       if (firebaseUser) {
@@ -40,20 +74,96 @@ export function AuthProvider({ children }) {
           email: firebaseUser.email,
           displayName: firebaseUser.displayName || userData?.name || "",
           role: token.claims.role || userData?.role || "customer",
+          favorites: userData?.favorites || [],
         });
       } else {
         setUser(null);
       }
-      setAuthLoading(false); // ya sabemos si hay usuario o no
+      setAuthLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
-  // Función logout
+  // 🔹 Login con email y contraseña
+  const loginWithEmail = async (email, password) => {
+    setError("");
+    setLoading(true);
+    try {
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const firebaseUser = userCredential.user;
+
+      const idToken = await firebaseUser.getIdTokenResult();
+      if (idToken.claims.role === "admin") {
+        await signOut(auth);
+        throw new Error("Los administradores deben usar el panel especial");
+      }
+
+      const mergedFavs = await mergeFavorites(firebaseUser);
+      const userData = await updateUserData(firebaseUser);
+
+      setUser({
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        displayName: firebaseUser.displayName || userData?.name || "",
+        role: idToken.claims.role || userData?.role || "customer",
+        favorites: mergedFavs,
+      });
+
+      return true;
+    } catch (error) {
+      handleAuthError(error);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 🔹 Login con Google
+  const loginWithGoogle = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
+      const result = await signInWithPopup(auth, provider);
+      const firebaseUser = result.user;
+
+      const idToken = await firebaseUser.getIdTokenResult();
+      if (idToken.claims.role === "admin") {
+        await signOut(auth);
+        throw new Error("Los administradores deben usar el panel especial");
+      }
+
+      const mergedFavs = await mergeFavorites(firebaseUser);
+      const userData = await updateUserData(firebaseUser);
+
+      setUser({
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        displayName: firebaseUser.displayName || userData?.name || "",
+        role: idToken.claims.role || userData?.role || "customer",
+        favorites: mergedFavs,
+      });
+
+      return true;
+    } catch (error) {
+      handleAuthError(error);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 🔹 Logout
   const logout = async () => {
     try {
       await signOut(auth);
+      setUser(null);
       return { success: true };
     } catch (error) {
       setError(error.message);
@@ -61,95 +171,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Actualizar datos del usuario desde Firestore
-  const updateUserData = async (user) => {
-    const userRef = doc(db, "users", user.uid);
-    const userDoc = await getDoc(userRef);
-    return userDoc.exists() ? userDoc.data() : null;
-  };
-
-  // Verificar rol del usuario
-  const checkUserRole = async (email) => {
-    try {
-      const usersRef = collection(db, "users");
-      const q = query(
-        usersRef,
-        where("email", "==", email.toLowerCase()),
-        limit(1)
-      );
-      const querySnapshot = await getDocs(q);
-
-      if (querySnapshot.empty) return "customer";
-
-      const userData = querySnapshot.docs[0].data();
-      return userData.role || "customer";
-    } catch (error) {
-      console.error("Error verificando rol:", error);
-      return "customer"; // Fallback seguro
-    }
-  };
-
-  // Login con email y contraseña
-  const loginWithEmail = async (email, password) => {
-    setError("");
-    setLoading(true);
-
-    try {
-      // 1. Intentar login primero
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-      const user = userCredential.user;
-
-      // 2. Verificar rol después del login (con permisos)
-      const idToken = await user.getIdTokenResult();
-      if (idToken.claims.role === "admin") {
-        await signOut(auth);
-        throw new Error("Los administradores deben usar el panel especial");
-      }
-
-      // 3. Actualizar datos y redirigir
-      await updateUserData(user);
-      return true;
-    } catch (error) {
-      handleAuthError(error);
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Login con Google
-  const loginWithGoogle = async () => {
-    setError("");
-    setLoading(true);
-
-    try {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: "select_account" });
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      // Verificar rol
-      const idToken = await user.getIdTokenResult();
-      if (idToken.claims.role === "admin") {
-        await signOut(auth);
-        throw new Error("Los administradores deben usar el panel especial");
-      }
-
-      await updateUserData(user);
-      return true;
-    } catch (error) {
-      handleAuthError(error);
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Manejo de errores
+  // 🔹 Manejo de errores
   const handleAuthError = (error) => {
     let errorMessage = "Error al iniciar sesión";
     switch (error.code) {
@@ -169,71 +191,16 @@ export function AuthProvider({ children }) {
     setError(errorMessage);
   };
 
-  // Función específica para login de admin con email
-  const loginAdminWithEmail = async (email, password) => {
-    setError("");
-    setLoading(true);
-    try {
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-      const user = userCredential.user;
-
-      // Verificar rol en Firestore
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      if (!userDoc.exists() || userDoc.data().role !== "admin") {
-        await signOut(auth);
-        throw new Error("Acceso restringido a administradores");
-      }
-
-      return user;
-    } catch (error) {
-      handleAuthError(error);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Función específica para login de admin con Google
-  const loginAdminWithGoogle = async () => {
-    setError("");
-    setLoading(true);
-    try {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      // Verificar rol en Firestore
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      if (!userDoc.exists() || userDoc.data().role !== "admin") {
-        await signOut(auth);
-        throw new Error("Acceso restringido a administradores");
-      }
-
-      return user;
-    } catch (error) {
-      handleAuthError(error);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Proveer valores del contexto
   const value = {
-    user, // <- Añade esto
+    user,
     error,
     loading,
     authLoading,
     loginWithEmail,
     loginWithGoogle,
-    logout, // <- Añade esto
+    logout,
     setError,
-    loginAdminWithEmail,
-    loginAdminWithGoogle,
+    setUser, // 🔹 para actualizar favoritos en tiempo real
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

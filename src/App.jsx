@@ -24,6 +24,7 @@ import LoginFormAdmin from "./components/LoginFormAdmin";
 import HomeEditorLayout from "./pages/admin/HomeEditorLayout";
 import AdminCarruselEditor from "./pages/admin/AdminCarruselEditor";
 import CarruselPage from "./pages/CarruselPage";
+import Favorites from "./pages/Favorites";
 
 function App() {
   const location = useLocation();
@@ -47,6 +48,7 @@ function App() {
         <Route path="/mis-compras" element={<MisCompras />} />
         <Route path="/perfil" element={<Perfil />} />
         <Route path="/carrusel" element={<CarruselPage />} />
+        <Route path="favoritos" element={<Favorites />} />
 
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />

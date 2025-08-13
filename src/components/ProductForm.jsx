@@ -17,6 +17,7 @@ export default function ProductForm() {
     stock: 0,
     image: "",
     active: true,
+    favorites: [],
   });
 
   useEffect(() => {
@@ -32,6 +33,7 @@ export default function ProductForm() {
             ...data,
             priceBase: data.priceBase || data.price,
             desc: data.desc || 0,
+            favorites: data.favorites || [],
           });
         }
         setLoading(false);

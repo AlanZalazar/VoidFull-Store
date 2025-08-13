@@ -1,5 +1,5 @@
 import { useCart } from "../context/CartContext";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Swal from "sweetalert2";
 import { HeartIcon as HeartOutline } from "@heroicons/react/24/outline";
 import {
@@ -11,25 +11,82 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { db } from "../firebase";
-import { deleteDoc, doc } from "firebase/firestore";
+import {
+  deleteDoc,
+  doc,
+  arrayRemove,
+  arrayUnion,
+  updateDoc,
+  getDoc,
+} from "firebase/firestore";
 import { createPortal } from "react-dom";
 
 function ProductCard({ product, onDelete }) {
   const { addToCart, cartItems } = useCart();
-  const { user } = useAuth();
+  const { user } = useAuth(); // Asegurate de que acá tengas user.uid y (si querés) role
   const navigate = useNavigate();
+
   const [isHovered, setIsHovered] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [currentQuantity, setCurrentQuantity] = useState(0);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [localFavorites, setLocalFavorites] = useState([]);
+
+  // Normalizamos el id del producto a string para comparar siempre igual
+  const productId = useMemo(() => String(product?.id ?? ""), [product?.id]);
 
   const isAdmin = user?.role === "admin";
 
+  // Cargar favoritos del localStorage al iniciar (solo una vez)
   useEffect(() => {
-    const cartItem = cartItems.find((item) => item.id === product.id);
+    const saved = localStorage.getItem("favorites");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setLocalFavorites(Array.isArray(parsed) ? parsed.map(String) : []);
+      } catch {
+        setLocalFavorites([]);
+      }
+    }
+  }, []);
+
+  // Determinar si es favorito al montar / cambiar usuario / cambiar localFavorites
+  // - ONLINE: lee Firestore UNA VEZ para decidir (evita desmarcar antes de tiempo)
+  // - OFFLINE: usa localStorage
+  useEffect(() => {
+    let cancelled = false;
+
+    const decideFavOnline = async () => {
+      try {
+        const userRef = doc(db, "users", user.uid);
+        const snap = await getDoc(userRef);
+        const favs = (snap.data()?.favorites || []).map(String);
+        if (!cancelled) setIsFavorite(favs.includes(productId));
+      } catch (e) {
+        // si falla la lectura, no toques el estado
+        console.error("Error leyendo favorites del usuario:", e);
+      }
+    };
+
+    if (user?.uid) {
+      // ONLINE: no marques/desmarques hasta tener la respuesta
+      decideFavOnline();
+    } else {
+      // OFFLINE
+      setIsFavorite(localFavorites.map(String).includes(productId));
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid, productId, localFavorites]);
+
+  // Refrescar contador del carrito
+  useEffect(() => {
+    const cartItem = cartItems.find((item) => String(item.id) === productId);
     setCurrentQuantity(cartItem?.quantity || 0);
-  }, [cartItems, product.id]);
+  }, [cartItems, productId]);
 
   const handleAddToCart = async () => {
     if (!product) return;
@@ -60,19 +117,71 @@ function ProductCard({ product, onDelete }) {
     }
   };
 
-  const toggleFavorite = () => {
-    setIsFavorite(!isFavorite);
-    Swal.fire({
-      position: "top-end",
-      icon: "success",
-      title: isFavorite ? "Removido de favoritos" : "❤️ ¡Agregado a favoritos!",
-      showConfirmButton: false,
-      timer: 1500,
-      timerProgressBar: true,
-      toast: true,
-      background: isFavorite ? "#6B7280" : "#EC4899",
-      iconColor: isFavorite ? "#9CA3AF" : "#F472B6",
-    });
+  const toggleFavorite = async () => {
+    // Normalizamos también lo que guardamos
+    const pid = productId;
+
+    if (!user?.uid) {
+      // OFFLINE: localStorage
+      const exists = localFavorites.includes(pid);
+      const newFavorites = exists
+        ? localFavorites.filter((id) => id !== pid)
+        : [...localFavorites, pid];
+
+      setLocalFavorites(newFavorites);
+      localStorage.setItem("favorites", JSON.stringify(newFavorites));
+      setIsFavorite(!exists);
+
+      // 🔹 Notificación offline
+      Swal.fire({
+        position: "top-end",
+        icon: "success",
+        title: exists ? "Removido de favoritos" : "❤️ ¡Agregado a favoritos!",
+        showConfirmButton: false,
+        timer: 1500,
+        timerProgressBar: true,
+        toast: true,
+        background: exists ? "#6B7280" : "#EC4899",
+        iconColor: exists ? "#9CA3AF" : "#F472B6",
+      });
+
+      return;
+    }
+
+    // ONLINE: Firestore (UI optimista)
+    const prev = isFavorite;
+    setIsFavorite(!prev);
+
+    try {
+      const userRef = doc(db, "users", user.uid);
+      if (prev) {
+        await updateDoc(userRef, { favorites: arrayRemove(pid) });
+      } else {
+        await updateDoc(userRef, { favorites: arrayUnion(pid) });
+      }
+
+      // 🔹 Notificación online
+      Swal.fire({
+        position: "top-end",
+        icon: "success",
+        title: prev ? "Removido de favoritos" : "❤️ ¡Agregado a favoritos!",
+        showConfirmButton: false,
+        timer: 1500,
+        timerProgressBar: true,
+        toast: true,
+        background: prev ? "#6B7280" : "#EC4899",
+        iconColor: prev ? "#9CA3AF" : "#F472B6",
+      });
+    } catch (error) {
+      console.error("Error updating favorites:", error);
+      // rollback si falla
+      setIsFavorite(prev);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "No se pudo actualizar tus favoritos.",
+      });
+    }
   };
 
   const handleEdit = () => {
@@ -95,8 +204,6 @@ function ProductCard({ product, onDelete }) {
       try {
         await deleteDoc(doc(db, "products", product.id));
         Swal.fire("¡Eliminado!", "El producto ha sido eliminado.", "success");
-
-        // 🔹 Actualizar el estado en el padre
         if (onDelete) onDelete(product.id);
       } catch (error) {
         console.error("Error al eliminar producto:", error);
@@ -124,17 +231,17 @@ function ProductCard({ product, onDelete }) {
 
   return (
     <>
-      {/* Card */}
       <div className="min-w-[280px] relative bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 hover:shadow-xl h-full flex flex-col border border-gray-100">
-        {/* Imagen y botones */}
         <div className="relative flex-1">
-          {/* Botón favoritos */}
           <button
             onClick={(e) => {
               e.stopPropagation();
               toggleFavorite();
             }}
             className="absolute top-3 right-3 z-20 p-2 rounded-full bg-white/80 backdrop-blur-sm hover:bg-pink-100 transition-colors shadow-sm"
+            aria-label={
+              isFavorite ? "Quitar de favoritos" : "Agregar a favoritos"
+            }
           >
             {isFavorite ? (
               <HeartSolid className="h-6 w-6 text-pink-500 animate-[pulse_0.5s_ease-in-out]" />
@@ -143,14 +250,12 @@ function ProductCard({ product, onDelete }) {
             )}
           </button>
 
-          {/* Badge descuento */}
           {hasDiscount && (
             <div className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full z-10 shadow-sm">
               -{product.desc}%
             </div>
           )}
 
-          {/* Imagen */}
           <div
             className="relative h-64 w-full overflow-hidden group cursor-pointer"
             onClick={openDetailsModal}
@@ -174,7 +279,6 @@ function ProductCard({ product, onDelete }) {
           </div>
         </div>
 
-        {/* Contenido */}
         <div className="p-4 flex flex-col gap-2">
           <div className="flex justify-between items-start">
             <div className="flex-1 min-w-0">
@@ -203,7 +307,6 @@ function ProductCard({ product, onDelete }) {
             </div>
           </div>
 
-          {/* Botones */}
           <div className="flex items-center gap-2 mt-4">
             {isAdmin ? (
               <>
@@ -260,7 +363,6 @@ function ProductCard({ product, onDelete }) {
         </div>
       </div>
 
-      {/* Modal con Portal */}
       {showDetailsModal &&
         createPortal(
           <div
@@ -279,6 +381,7 @@ function ProductCard({ product, onDelete }) {
                   <button
                     onClick={closeDetailsModal}
                     className="text-gray-500 hover:text-gray-700"
+                    aria-label="Cerrar modal"
                   >
                     ✕
                   </button>

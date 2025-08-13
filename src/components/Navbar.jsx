@@ -179,6 +179,29 @@ const NavBar = () => {
                         Mi perfil
                       </button>
 
+                      {/* Botón Ver Favoritos solo para no admins */}
+                      {userRole !== "admin" && (
+                        <button
+                          onClick={() => {
+                            navigate("/favoritos");
+                            setIsProfileOpen(false);
+                          }}
+                          className="flex items-center w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-100 transition-all duration-200"
+                        >
+                          {/* Puedes cambiar el icono si querés */}
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-4 w-4 mr-2 text-pink-500"
+                            fill="currentColor"
+                            viewBox="0 0 24 24"
+                            stroke="none"
+                          >
+                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41 0.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                          </svg>
+                          Ver favoritos
+                        </button>
+                      )}
+
                       {/* Ocultar "Mis compras" si es admin */}
                       {userRole !== "admin" && (
                         <button
