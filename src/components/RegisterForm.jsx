@@ -1,163 +1,102 @@
-// src/components/RegisterForm.jsx
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 export default function RegisterForm() {
+  const { register, loading, error } = useAuth();
   const navigate = useNavigate();
-  const { register } = useAuth();
+
   const [form, setForm] = useState({
+    name: "",
+    dni: "",
+    phone: "",
     email: "",
     password: "",
-    dni: "",
-    firstName: "",
-    lastName: "",
-    phone: "",
-    street: "",
-    floor: "",
-    city: "",
-    province: "",
-    postalCode: "",
-    reference: "",
-    deliveryNotes: "",
   });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleRegister = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError("");
-    const { email, password, ...userData } = form;
-    const res = await register(email, password, userData);
-    if (res.success) navigate("/login", { state: { registered: true } });
-    else setError("No se pudo crear la cuenta: " + res.error);
-    setLoading(false);
+    setSuccessMessage("");
+
+    const { name, dni, phone, email, password } = form;
+    const res = await register(email, password, { name, dni, phone });
+
+    if (res.success) {
+      setSuccessMessage("Cuenta creada con éxito. Redirigiendo...");
+      setTimeout(() => {
+        navigate("/login", { state: { registered: true } });
+      }, 1500);
+    }
   };
 
   return (
-    <form
-      onSubmit={handleRegister}
-      className="max-w-xl mx-auto bg-white p-6 rounded-lg shadow space-y-4"
-    >
-      <h2 className="text-2xl font-bold text-center">Crear cuenta</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div className="max-w-md mx-auto p-6 bg-white rounded-lg shadow-md">
+      <h2 className="text-2xl font-bold mb-4">Crear cuenta</h2>
+      {error && <p className="text-red-500 mb-2">{error}</p>}
+      {successMessage && (
+        <p className="text-green-600 mb-2">{successMessage}</p>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
         <input
-          name="firstName"
-          placeholder="Nombre"
-          value={form.firstName}
+          type="text"
+          name="name"
+          placeholder="Nombre completo"
+          value={form.name}
           onChange={handleChange}
+          className="w-full p-2 border rounded"
           required
-          className="p-2 border rounded"
         />
         <input
-          name="lastName"
-          placeholder="Apellido"
-          value={form.lastName}
+          type="text"
+          name="dni"
+          placeholder="DNI"
+          value={form.dni}
           onChange={handleChange}
+          className="w-full p-2 border rounded"
           required
-          className="p-2 border rounded"
         />
-      </div>
-      <input
-        name="email"
-        type="email"
-        placeholder="Email"
-        value={form.email}
-        onChange={handleChange}
-        required
-        className="w-full p-2 border rounded"
-      />
-      <input
-        name="password"
-        type="password"
-        placeholder="Contraseña"
-        value={form.password}
-        onChange={handleChange}
-        required
-        className="w-full p-2 border rounded"
-      />
-      <input
-        name="dni"
-        placeholder="DNI"
-        value={form.dni}
-        onChange={handleChange}
-        required
-        className="w-full p-2 border rounded"
-      />
-      <input
-        name="phone"
-        placeholder="Teléfono"
-        value={form.phone}
-        onChange={handleChange}
-        required
-        className="w-full p-2 border rounded"
-      />
-      <input
-        name="street"
-        placeholder="Calle y número"
-        value={form.street}
-        onChange={handleChange}
-        required
-        className="w-full p-2 border rounded"
-      />
-      <input
-        name="floor"
-        placeholder="Piso / Departamento"
-        value={form.floor}
-        onChange={handleChange}
-        className="w-full p-2 border rounded"
-      />
-      <input
-        name="city"
-        placeholder="Ciudad"
-        value={form.city}
-        onChange={handleChange}
-        required
-        className="w-full p-2 border rounded"
-      />
-      <input
-        name="province"
-        placeholder="Provincia"
-        value={form.province}
-        onChange={handleChange}
-        required
-        className="w-full p-2 border rounded"
-      />
-      <input
-        name="postalCode"
-        placeholder="Código Postal"
-        value={form.postalCode}
-        onChange={handleChange}
-        required
-        className="w-full p-2 border rounded"
-      />
-      <input
-        name="reference"
-        placeholder="Referencia (opcional)"
-        value={form.reference}
-        onChange={handleChange}
-        className="w-full p-2 border rounded"
-      />
-      <textarea
-        name="deliveryNotes"
-        placeholder="Instrucciones de entrega (opcional)"
-        value={form.deliveryNotes}
-        onChange={handleChange}
-        className="w-full p-2 border rounded"
-      />
-      {error && <p className="text-red-500 text-sm">{error}</p>}
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition disabled:opacity-50"
-      >
-        {loading ? "Creando..." : "Registrarse"}
-      </button>
-    </form>
+        <input
+          type="tel"
+          name="phone"
+          placeholder="Teléfono"
+          value={form.phone}
+          onChange={handleChange}
+          className="w-full p-2 border rounded"
+          required
+        />
+        <input
+          type="email"
+          name="email"
+          placeholder="Correo electrónico"
+          value={form.email}
+          onChange={handleChange}
+          className="w-full p-2 border rounded"
+          required
+        />
+        <input
+          type="password"
+          name="password"
+          placeholder="Contraseña"
+          value={form.password}
+          onChange={handleChange}
+          className="w-full p-2 border rounded"
+          required
+        />
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
+        >
+          {loading ? "Registrando..." : "Registrarse"}
+        </button>
+      </form>
+    </div>
   );
 }
